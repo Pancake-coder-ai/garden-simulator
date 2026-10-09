@@ -1,0 +1,2516 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000">
+<title>Садовый симулятор</title>
+<!-- Yandex Games SDK: официальный CDN. Игра полностью автономна — без внешних зависимостей -->
+<script src="https://yandex.ru/games/sdk/v2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;font-family:'Press Start 2P','Courier New',monospace}
+html,body{width:100%;height:100vh;height:100dvh;overflow:hidden;background:#000;color:#fff;display:flex;flex-direction:column;image-rendering:pixelated;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#game-area{flex:1 1 auto;position:relative;overflow:hidden;min-height:0;background:#3CBCFC}
+#canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:manipulation}
+#hud{position:absolute;top:0;left:0;right:0;padding:6px 6px 4px;display:flex;gap:3px;justify-content:space-between;pointer-events:none;z-index:5;flex-wrap:wrap}
+.hud-chip{background:#000;padding:3px 5px;font-size:9px;font-weight:bold;border:2px solid #FCFCFC;letter-spacing:0;font-family:monospace}
+#coins{color:#F8B800}#level{color:#A4E4FC}#weather{color:#FCFCFC}#season{color:#FCBCB0}
+#musicToggle,#fsToggle,#menuToggle{pointer-events:auto;cursor:pointer}
+#menuToggle{color:#F8B800}
+#offlineBadge{color:#FC7460;border-color:#FC7460}
+#xpBar{position:absolute;left:8px;right:8px;top:38px;height:6px;background:#000;border:2px solid #FCFCFC;overflow:hidden;z-index:5}
+#xpFill{height:100%;width:0%;background:#F8B800;transition:width .3s}
+#controls{padding:4px 2px 6px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px;z-index:5;background:#000;border-top:3px solid #7C7C7C;flex:0 0 auto;width:100%}
+.btn{padding:4px 1px;font-size:6px;font-weight:bold;border:2px solid #000;color:#fff;cursor:pointer;touch-action:manipulation;display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;text-shadow:1px 1px 0 #000;letter-spacing:0;font-family:monospace;overflow:hidden;box-sizing:border-box;min-width:0}
+.btn:active{filter:brightness(1.4)}
+.btn.locked{filter:grayscale(0.6);opacity:0.75}
+.btn .ico{font-size:12px;line-height:1}
+.btn .lbl{font-size:5px;font-family:monospace;letter-spacing:0;white-space:nowrap;width:100%;text-align:center;line-height:1.2;overflow:hidden}
+#shopBtn{background:#0078F8}#upgradeBtn{background:#A800A8}#craftBtn{background:#F8B800}
+#petBtn{background:#00A800}#fishBtn{background:#3CBCFC}#aquaBtn{background:#0078F8}
+#dailyBtn{background:#FC7460}#questBtn{background:#D82800}#skinBtn{background:#6844FC}
+#statBtn{background:#3C3C3C}#lbBtn{background:#F8B800}#achBtn{background:#B80000}
+#prestigeShopBtn{background:#F878F8}#prestigeBtn{background:#6844FC}
+.btn-badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 3px;background:#D82800;font-size:9px;font-weight:bold;color:#FCFCFC;display:none;align-items:center;justify-content:center;border:2px solid #FCFCFC;z-index:10;font-family:monospace}
+.btn-badge.show{display:flex}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;flex-direction:column;align-items:center;justify-content:center;padding:10px;z-index:10}
+.modal.active{display:flex}
+.modal-content{background:#3C3C3C;border:3px solid #FCFCFC;padding:12px;width:100%;max-width:400px;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:12px;margin-bottom:10px;text-align:center;color:#FCFCFC;text-shadow:2px 2px 0 #000;letter-spacing:1px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;justify-content:center}
+.tab-btn{padding:6px 10px;border:2px solid #000;background:#3C3C3C;color:#FCFCFC;font-size:7px;font-weight:bold;cursor:pointer;font-family:monospace;flex:1}
+.tab-btn.active{background:#F8B800;color:#000}
+.shop-item{background:#000;border:2px solid #7C7C7C;padding:8px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.shop-item .emoji{font-size:22px;flex-shrink:0}
+.shop-item .info{flex:1;min-width:0}
+.shop-item .name{font-weight:bold;font-size:8px;margin-bottom:3px}
+.shop-item .price{font-size:7px;color:#F8B800}
+.shop-item .sub{font-size:6px;opacity:.9;margin-top:3px;line-height:1.5}
+.shop-item button{padding:5px 6px;border:2px solid #000;background:#00A800;color:#fff;font-weight:bold;font-size:6px;cursor:pointer;min-width:48px;font-family:monospace}
+.shop-item button:disabled{background:#3C3C3C;color:#7C7C7C}
+.close-btn{width:100%;padding:9px;margin-top:6px;border:2px solid #000;background:#D82800;color:#FCFCFC;font-weight:bold;font-size:8px;cursor:pointer;font-family:monospace;letter-spacing:1px}
+.claim-all-btn{width:100%;padding:9px;margin-bottom:6px;border:2px solid #000;background:#F8B800;color:#000;font-weight:bold;font-size:8px;cursor:pointer;font-family:monospace}
+#toasts{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;align-items:center;pointer-events:none;z-index:100;width:90%;max-width:380px}
+.toast{background:#000;padding:7px 10px;font-size:7px;font-weight:bold;border:2px solid #FCFCFC;text-align:center;font-family:monospace;line-height:1.5}
+.daily-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px}
+.daily-day{background:#000;border:2px solid #7C7C7C;padding:5px 2px;text-align:center;font-size:6px;line-height:1.4}
+.daily-day .d-ico{font-size:16px;display:block;margin-bottom:2px}
+.daily-day.claimed{background:#005800;border-color:#00A800}
+.daily-day.today{background:#AC7C00;border-color:#F8B800}
+.quest-item{background:#000;border:2px solid #7C7C7C;padding:8px;margin-bottom:6px}
+.quest-item .q-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.quest-item .q-name{font-weight:bold;font-size:7px;line-height:1.4}
+.quest-item .q-reward{font-size:7px;color:#F8B800}
+.quest-item .q-bar{height:8px;background:#3C3C3C;border:2px solid #000;overflow:hidden;margin-bottom:5px}
+.quest-item .q-fill{height:100%;background:#58D854}
+.quest-item .q-status{font-size:6px;opacity:.9}
+.quest-item.done{background:#005800;border-color:#00A800}
+.quest-item.ready{background:#AC7C00;border-color:#F8B800}
+.quest-item.locked{opacity:0.5}
+.ach-item{background:#000;border:2px solid #7C7C7C;padding:8px;margin-bottom:5px;display:flex;gap:8px;align-items:center}
+.ach-item.unlocked{background:#005800;border-color:#00A800}
+.ach-item.ready{background:#AC7C00;border-color:#F8B800}
+.ach-item .a-ico{font-size:18px}
+.ach-item .a-name{font-weight:bold;font-size:7px;line-height:1.4}
+.ach-item .a-desc{font-size:6px;opacity:0.85;margin-top:3px;line-height:1.5}
+.ach-item .a-info{flex:1}
+.claim-btn{padding:6px 8px;border:2px solid #000;background:#00A800;color:#fff;font-weight:bold;font-size:7px;cursor:pointer;flex-shrink:0;font-family:monospace}
+.stat-row{display:flex;justify-content:space-between;padding:5px 3px;border-bottom:2px solid #3C3C3C;font-size:7px;align-items:center;gap:6px}
+.stat-row b{color:#F8B800}
+#loading{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:999;color:#A4E4FC;font-size:10px;flex-direction:column;gap:10px;letter-spacing:1px}
+.spinner{width:28px;height:28px;border:4px solid #3C3C3C;border-top-color:#A4E4FC;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.event-banner{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#D82800;border:3px solid #FCFCFC;padding:6px 12px;font-size:7px;font-weight:bold;z-index:8;pointer-events:none;max-width:90%;text-align:center;font-family:monospace;letter-spacing:0.5px;line-height:1.5}
+.npc-popup{position:fixed;bottom:140px;right:10px;background:#A800A8;border:3px solid #FCFCFC;padding:7px 9px;font-size:6px;font-weight:bold;z-index:8;max-width:150px;cursor:pointer;line-height:1.6}
+.npc-popup .npc-ico{font-size:16px;display:block;margin-bottom:3px}
+.fly-coin{position:fixed;font-size:16px;font-weight:bold;color:#F8B800;pointer-events:none;z-index:200;transition:all .8s cubic-bezier(.5,-0.5,.7,1.5)}
+#fishingCanvas{width:100%;height:140px;display:block;image-rendering:pixelated;border:3px solid #FCFCFC;background:#0078F8}
+.fishing-status{text-align:center;font-size:8px;margin:8px 0;padding:7px;background:#000;border:2px solid #FCFCFC;line-height:1.5}
+.fishing-status.cast{color:#A4E4FC}
+.fishing-status.bite{color:#F8B800;animation:pulse 0.3s infinite}
+.fishing-status.caught{color:#58D854}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.fishing-zone-btn{display:inline-block;padding:6px 10px;margin:0 3px;border:2px solid #000;background:#005800;color:#FCFCFC;font-size:7px;font-weight:bold;cursor:pointer;font-family:monospace}
+.fishing-zone-btn.active{background:#F8B800;color:#000}
+.fishing-zone-btn:disabled{background:#3C3C3C;color:#7C7C7C}
+#aquaCanvas{width:100%;height:280px;display:block;image-rendering:pixelated;border:3px solid #FCFCFC;background:#0000FC}
+.aqua-info{text-align:center;font-size:8px;margin-bottom:10px;line-height:1.7}
+.aqua-empty{text-align:center;padding:30px 15px;background:#000;border:3px solid #FCFCFC;margin-bottom:10px}
+.aqua-empty .big{font-size:40px;margin-bottom:12px;display:block}
+.aqua-empty .text{font-size:8px;line-height:1.7;color:#A4E4FC;margin-bottom:8px}
+.aqua-empty .hint{font-size:7px;color:#F8B800;line-height:1.6}
+#nameInput{width:100%;padding:10px;font-family:monospace;font-size:12px;background:#000;color:#F8B800;border:3px solid #FCFCFC;text-align:center;box-sizing:border-box;margin-bottom:10px}
+.welcome-box{text-align:left;font-size:7px;line-height:1.8;padding:8px;background:#000;border:2px solid #7C7C7C;margin-bottom:10px}
+.welcome-box .row{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+.welcome-box .ico{font-size:20px;flex-shrink:0}
+.welcome-box .txt{flex:1}
+.welcome-box .txt b{color:#F8B800}
+.main-menu{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));gap:12px;overflow-y:auto;background:linear-gradient(180deg,rgba(60,188,252,.86) 0%,rgba(0,120,248,.93) 45%,rgba(0,0,0,.97) 100%)}
+.main-menu.hidden{display:none}
+.menu-title{text-align:center}
+.menu-logo{font-size:52px;line-height:1;margin-bottom:4px;animation:menuBob 2.2s ease-in-out infinite}
+@keyframes menuBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.menu-title h1{font-size:13px;color:#FCFCFC;text-shadow:3px 3px 0 #000;letter-spacing:2px;line-height:1.4;margin-bottom:4px}
+.menu-sub{font-size:7px;color:#A4E4FC;text-shadow:1px 1px 0 #000;letter-spacing:1px;font-family:monospace}
+.menu-buttons{width:100%;max-width:340px;display:flex;flex-direction:column;gap:8px}
+.menu-btn{padding:14px 10px;border:3px solid #000;color:#FCFCFC;font-weight:bold;font-size:10px;cursor:pointer;font-family:monospace;letter-spacing:1px;text-shadow:2px 2px 0 #000;box-shadow:inset 0 -4px 0 rgba(0,0,0,.4),3px 3px 0 #000;position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px}
+.menu-btn:active{transform:translate(2px,2px)}
+.menu-play{background:#00A800;font-size:13px;padding:18px 10px;min-height:56px}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.menu-sm{font-size:8px;padding:12px 4px;min-height:44px;letter-spacing:0}
+.menu-sm.blue{background:#0078F8}
+.menu-sm.purple{background:#6844FC}
+.menu-sm.orange{background:#F8B800;color:#000;text-shadow:1px 1px 0 #FCFCFC}
+.menu-sm.red{background:#B80000}
+.menu-sm.green{background:#00A800}
+.menu-sm.teal{background:#3CBCFC;color:#000;text-shadow:1px 1px 0 #FCFCFC}
+.menu-sm.gold{background:#AC7C00}
+.menu-btn.locked{filter:grayscale(.7);opacity:.9}
+.lock-badge{position:absolute;top:-7px;right:-7px;background:#D82800;border:2px solid #FCFCFC;font-size:7px;padding:2px 5px;text-shadow:none;box-shadow:2px 2px 0 #000;letter-spacing:0}
+.menu-stats{width:100%;max-width:340px;background:rgba(0,0,0,.65);border:2px solid #FCFCFC;padding:8px 6px;font-size:7px;text-align:center;color:#A4E4FC;line-height:1.7;font-family:monospace;letter-spacing:1px}
+.menu-stats b{color:#F8B800}
+.menu-player{display:flex;align-items:center;justify-content:center;gap:6px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px dashed #7C7C7C;font-size:8px;color:#FCFCFC}
+.menu-player .av{font-size:16px}
+.menu-version{font-size:6px;color:#7C7C7C;font-family:monospace;letter-spacing:1px;margin-top:4px}
+.privacy-link{background:#3C3C3C;color:#A4E4FC;border:2px solid #7C7C7C;font-size:7px;text-align:center;padding:8px;text-decoration:none;display:block;max-width:340px;width:100%}
+#nameModal,#renameModal{z-index:60}
+.avatar-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:8px;background:#000;padding:6px;border:2px solid #7C7C7C}
+.avatar-btn{font-size:18px;background:#3C3C3C;border:2px solid #000;padding:3px;cursor:pointer;aspect-ratio:1;display:flex;align-items:center;justify-content:center;line-height:1;color:#FCFCFC}
+.avatar-btn.active{background:#F8B800;border-color:#FCFCFC;box-shadow:0 0 0 2px #F8B800}
+.name-label{font-size:7px;text-align:center;margin:8px 0 6px;color:#F8B800;letter-spacing:1px;font-family:monospace}
+.lb-refresh{width:100%;padding:9px;margin-bottom:6px;border:2px solid #000;background:#00A800;color:#fff;font-weight:bold;font-size:8px;cursor:pointer;font-family:monospace;letter-spacing:1px}
+.week-prize-info{text-align:center;font-size:6px;padding:6px;background:#000;border:2px solid #AC7C00;margin-bottom:8px;color:#F8B800;line-height:1.6;font-family:monospace}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div>ЗАГРУЗКА...</div>
+<div id="game-area">
+  <canvas id="canvas"></canvas>
+  <div id="hud">
+    <div class="hud-chip" id="coins">💰 5</div>
+    <div class="hud-chip" id="level">⭐ 1</div>
+    <div class="hud-chip" id="weather">☀️ ЯСНО</div>
+    <div class="hud-chip" id="season">🌸 ВЕСНА</div>
+    <div class="hud-chip" id="offlineBadge" style="display:none">📴 OFF</div>
+    <div class="hud-chip" id="menuToggle">☰</div>
+    <div class="hud-chip" id="musicToggle">🔊</div>
+  </div>
+  <div id="xpBar"><div id="xpFill"></div></div>
+</div>
+<div id="controls">
+  <button class="btn" id="shopBtn"><span class="ico">🛒</span><span class="lbl">МАГАЗИН</span></button>
+  <button class="btn" id="upgradeBtn"><span class="ico">⚡</span><span class="lbl">АПГРЕЙД</span></button>
+  <button class="btn" id="craftBtn"><span class="ico">⚒️</span><span class="lbl">КРАФТ</span><span class="btn-badge" id="craftBadge">0</span></button>
+  <button class="btn" id="petBtn"><span class="ico">🐶</span><span class="lbl">ПИТОМЦЫ</span></button>
+  <button class="btn" id="fishBtn"><span class="ico">🎣</span><span class="lbl">ПРУД</span><span class="btn-badge" id="fishBadge">0</span></button>
+  <button class="btn" id="aquaBtn"><span class="ico">🐠</span><span class="lbl">АКВАРИУМ</span></button>
+  <button class="btn" id="dailyBtn"><span class="ico">🎁</span><span class="lbl">БОНУС</span><span class="btn-badge" id="dailyBadge">1</span></button>
+  <button class="btn" id="questBtn"><span class="ico">📜</span><span class="lbl">КВЕСТЫ</span><span class="btn-badge" id="questBadge">0</span></button>
+  <button class="btn" id="skinBtn"><span class="ico">🎨</span><span class="lbl">СКИНЫ</span></button>
+  <button class="btn" id="statBtn"><span class="ico">📊</span><span class="lbl">СТАТЫ</span></button>
+  <button class="btn" id="lbBtn"><span class="ico">🏅</span><span class="lbl">ТОП</span></button>
+  <button class="btn" id="achBtn"><span class="ico">🏆</span><span class="lbl">НАГРАДЫ</span><span class="btn-badge" id="achBadge">0</span></button>
+  <button class="btn" id="prestigeShopBtn"><span class="ico">🛍️</span><span class="lbl">ЗВЁЗДЫ</span><span class="btn-badge" id="pStarsBadge">0</span></button>
+  <button class="btn" id="prestigeBtn"><span class="ico">♻️</span><span class="lbl">ПРЕСТИЖ</span></button>
+</div>
+
+<div class="modal" id="welcomeModal"><div class="modal-content">
+  <h2>🌱 ДОБРО ПОЖАЛОВАТЬ!</h2>
+  <div class="welcome-box">
+    <div class="row"><span class="ico">👆</span><div class="txt"><b>ТАПАЙ</b> по грядке — посадишь семя</div></div>
+    <div class="row"><span class="ico">💧</span><div class="txt">Тапай ещё — <b>ПОЛИВАЙ</b></div></div>
+    <div class="row"><span class="ico">🌾</span><div class="txt">Когда выросло — тапни и <b>СОБЕРИ</b></div></div>
+    <div class="row"><span class="ico">🛒</span><div class="txt">Покупай семена в <b>МАГАЗИНЕ</b></div></div>
+    <div class="row"><span class="ico">🎣</span><div class="txt"><b>ПРУД</b> откроется на 5 уровне</div></div>
+    <div class="row"><span class="ico">🐠</span><div class="txt">Ловишь рыбу — она попадает в <b>АКВАРИУМ</b></div></div>
+  </div>
+  <button class="close-btn" id="welcomeOkBtn" style="background:#00A800">ПОНЯТНО!</button>
+</div></div>
+
+<div class="modal" id="rulesModal"><div class="modal-content">
+  <h2>📜 КАК ИГРАТЬ</h2>
+  <div class="welcome-box">
+    <div class="row"><span class="ico">👆</span><div class="txt"><b>ТАПАЙ</b> по грядке — посадишь семя</div></div>
+    <div class="row"><span class="ico">💧</span><div class="txt">Тапай ещё — <b>ПОЛИВАЙ</b></div></div>
+    <div class="row"><span class="ico">🌾</span><div class="txt">Когда выросло — тапни и <b>СОБЕРИ</b> урожай</div></div>
+    <div class="row"><span class="ico">🛒</span><div class="txt">Покупай семена в <b>МАГАЗИНЕ</b>, там же апгрейды</div></div>
+    <div class="row"><span class="ico">🎣</span><div class="txt"><b>ПРУД</b> откроется на <b>5 уровне</b></div></div>
+    <div class="row"><span class="ico">🐠</span><div class="txt">Каждая новая рыба в <b>АКВАРИУМЕ</b> даёт <b>+1% к монетам</b></div></div>
+    <div class="row"><span class="ico">🌸</span><div class="txt">Сезоны и погода <b>ускоряют рост</b></div></div>
+    <div class="row"><span class="ico">🏆</span><div class="txt">Выполняй <b>ДОСТИЖЕНИЯ</b> и <b>КВЕСТЫ</b></div></div>
+    <div class="row"><span class="ico">♻️</span><div class="txt">На <b>30 уровне</b> откроется <b>ПРЕСТИЖ</b></div></div>
+    <div class="row"><span class="ico">🏅</span><div class="txt">Топ-3 недели получают <b>звёзды и монеты</b></div></div>
+  </div>
+  <button class="close-btn" onclick="closeModal('rulesModal')">ПОНЯТНО</button>
+</div></div>
+
+<div class="modal" id="shopModal"><div class="modal-content"><h2>🛒 МАГАЗИН</h2><div id="shopList"></div><button class="close-btn" onclick="closeModal('shopModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="upgradeModal"><div class="modal-content"><h2>⚡ УЛУЧШЕНИЯ</h2><div id="upgradeList"></div><button class="close-btn" onclick="closeModal('upgradeModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="craftModal"><div class="modal-content"><h2>⚒️ КРАФТ</h2><div id="craftList"></div><button class="close-btn" onclick="closeModal('craftModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="petModal"><div class="modal-content"><h2>🐶 ПИТОМЦЫ</h2><div id="petList"></div><button class="close-btn" onclick="closeModal('petModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="dailyModal"><div class="modal-content"><h2>🎁 БОНУС</h2><div style="text-align:center;font-size:6px;opacity:0.85;margin-bottom:8px">НОВАЯ КАЖДЫЕ 4 ЧАСА</div><div class="daily-grid" id="dailyGrid"></div><button class="close-btn" id="claimDailyBtn" style="background:#00A800;margin-top:0">ЗАБРАТЬ</button><button class="close-btn" id="claimDailyX2Btn" style="background:#AC7C00">ЗАБРАТЬ X2 📺</button><button class="close-btn" onclick="closeModal('dailyModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="questModal"><div class="modal-content"><h2>📜 КВЕСТЫ</h2>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabDaily" onclick="switchQuestTab('daily')">ЕЖЕДНЕВНЫЕ</button>
+    <button class="tab-btn" id="tabNPC" onclick="switchQuestTab('npc')">NPC 7 ДНЕЙ</button>
+  </div>
+  <div id="questList"></div><button class="close-btn" onclick="closeModal('questModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="skinModal"><div class="modal-content"><h2>🎨 СКИНЫ</h2><div id="skinList"></div><button class="close-btn" onclick="closeModal('skinModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="statModal"><div class="modal-content"><h2>📊 СТАТИСТИКА</h2>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabStat" onclick="switchStatTab('stat')">СТАТЫ</button>
+    <button class="tab-btn" id="tabRecords" onclick="switchStatTab('records')">РЕКОРДЫ</button>
+  </div>
+  <div id="statList"></div><button class="close-btn" onclick="closeModal('statModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="lbModal"><div class="modal-content"><h2>🏅 ТОП</h2>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabAll" onclick="switchLbTab('all')">ВСЁ ВРЕМЯ</button>
+    <button class="tab-btn" id="tabSeason" onclick="switchLbTab('season')">СЕЗОН</button>
+  </div>
+  <div class="week-prize-info">🥇 1 место: +5⭐ +50000💰<br>🥈 2 место: +3⭐ +20000💰<br>🥉 3 место: +1⭐ +5000💰</div>
+  <button class="lb-refresh" id="lbRefreshBtn">🔄 ОБНОВИТЬ</button>
+  <div id="lbList"></div><button class="close-btn" onclick="closeModal('lbModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="achModal"><div class="modal-content"><h2>🏆 ДОСТИЖЕНИЯ</h2><div id="achList"></div><button class="close-btn" onclick="closeModal('achModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="prestigeShopModal"><div class="modal-content"><h2>🛍️ ЗВЁЗДЫ</h2><div style="text-align:center;margin-bottom:10px;font-size:8px">У ТЕБЯ: <b style="color:#F8B800" id="pStarsView">0</b> ⭐</div><div id="prestigeShopList"></div><button class="close-btn" onclick="closeModal('prestigeShopModal')">ЗАКРЫТЬ</button></div></div>
+<div class="modal" id="prestigeModal"><div class="modal-content"><h2>♻️ ПРЕСТИЖ</h2><div id="prestigeInfo" style="text-align:center;margin-bottom:12px;line-height:1.7;font-size:7px"></div><button class="close-btn" id="doPrestigeBtn">СБРОСИТЬ</button><button class="close-btn" onclick="closeModal('prestigeModal')">ОТМЕНА</button></div></div>
+<div class="modal" id="npcModal"><div class="modal-content"><h2>🧙 ТОРГОВЕЦ</h2><div id="npcOffer"></div><button class="close-btn" onclick="closeModal('npcModal')">УЙТИ</button></div></div>
+<div class="modal" id="fishingModal"><div class="modal-content"><h2>🎣 РЫБАЛКА</h2>
+  <div style="text-align:center;margin-bottom:8px">
+    <button class="fishing-zone-btn" id="zoneBtn1">🌊 ПРУД</button>
+    <button class="fishing-zone-btn" id="zoneBtn2">👑 ЗОЛОТОЙ</button>
+  </div>
+  <canvas id="fishingCanvas"></canvas>
+  <div class="fishing-status" id="fishingStatus">ТАПНИ ПО ПРУДУ</div>
+  <div style="text-align:center;font-size:6px;margin-bottom:10px;line-height:1.7">
+    УДОЧКА: <b style="color:#A4E4FC" id="rodName">Бамбуковая</b><br>
+    ПОЙМАНО: <b style="color:#F8B800" id="fishCaught">0</b> • РЕКОРД: <b style="color:#F8B800" id="fishRecord">0💰</b>
+  </div>
+  <div id="rodList"></div>
+  <button class="close-btn" onclick="closeModal('fishingModal')">ЗАКРЫТЬ</button>
+</div></div>
+<div class="modal" id="aquaModal"><div class="modal-content"><h2>🐠 АКВАРИУМ</h2>
+  <div class="aqua-info" id="aquaInfo"></div>
+  <div id="aquaEmpty" class="aqua-empty" style="display:none">
+    <span class="big">🐟</span>
+    <div class="text">АКВАРИУМ ПОКА ПУСТ</div>
+    <div class="hint">
+      Лови рыбу в 🎣 <b>ПРУДУ</b><br>
+      (откроется на 5 уровне)<br><br>
+      Каждая новая рыба добавляет<br>
+      +1% к монетам навсегда!
+    </div>
+  </div>
+  <canvas id="aquaCanvas"></canvas>
+  <div style="text-align:center;font-size:6px;margin-bottom:10px;line-height:1.6;opacity:0.8">
+    КАЖДАЯ УНИКАЛЬНАЯ РЫБА ДАЁТ +1% К МОНЕТАМ
+  </div>
+  <button class="close-btn" onclick="closeModal('aquaModal')">ЗАКРЫТЬ</button>
+</div></div>
+
+<div class="modal" id="nameModal"><div class="modal-content">
+  <h2>🎮 ДОБРО ПОЖАЛОВАТЬ!</h2>
+  <div style="text-align:center;font-size:7px;margin-bottom:10px;line-height:1.7;color:#A4E4FC">
+    Имя и аватар нужны для лидерборда.<br>Потом их можно сменить в меню!
+  </div>
+  <div class="name-label">ВЫБЕРИ АВАТАР:</div>
+  <div class="avatar-grid" id="avatarGrid"></div>
+  <div class="name-label">ВВЕДИ ИМЯ (2-15 символов):</div>
+  <input type="text" id="nameInput" maxlength="15" value="" placeholder="Садовод">
+  <div id="nameError" style="text-align:center;font-size:7px;color:#FC7460;margin-bottom:8px;display:none"></div>
+  <button class="close-btn" id="nameSaveBtn" style="background:#00A800">🚀 НАЧАТЬ ИГРУ</button>
+</div></div>
+
+<div class="modal" id="renameModal"><div class="modal-content">
+  <h2>✏️ СМЕНА НИКА</h2>
+  <div style="text-align:center;font-size:7px;margin-bottom:10px;line-height:1.7;color:#F8B800">
+    ⚠️ Старые результаты в топе удалятся,<br>запишутся новые. Прогресс сохранится.
+  </div>
+  <div class="name-label">НОВЫЙ АВАТАР:</div>
+  <div class="avatar-grid" id="renameAvatarGrid"></div>
+  <div class="name-label">НОВОЕ ИМЯ (2-15):</div>
+  <input type="text" id="renameInput" maxlength="15" placeholder="Новое имя">
+  <div id="renameError" style="text-align:center;font-size:7px;color:#FC7460;margin-bottom:8px;display:none"></div>
+  <button class="close-btn" id="renameSaveBtn" style="background:#00A800">💾 СОХРАНИТЬ</button>
+  <button class="close-btn" onclick="closeModal('renameModal')">ОТМЕНА</button>
+</div></div>
+
+<div class="main-menu hidden" id="mainMenu">
+  <div class="menu-title">
+    <div class="menu-logo">🌱</div>
+    <h1>САДОВЫЙ<br>СИМУЛЯТОР</h1>
+    <div class="menu-sub">вырасти свой сад</div>
+  </div>
+  <div class="menu-buttons">
+    <button class="menu-btn menu-play" id="menuPlayBtn">▶ ИГРАТЬ</button>
+    <div class="menu-grid">
+      <button class="menu-btn menu-sm orange" id="menuRulesBtn">📜 ПРАВИЛА</button>
+      <button class="menu-btn menu-sm teal locked" id="menuPondBtn">🎣 ПРУД<span class="lock-badge" id="pondLock">🔒 УР.5</span></button>
+      <button class="menu-btn menu-sm blue" id="menuAquaBtn">🐠 АКВАРИУМ</button>
+      <button class="menu-btn menu-sm purple" id="menuTopBtn">🏅 ТОП</button>
+      <button class="menu-btn menu-sm red" id="menuAchBtn">🏆 НАГРАДЫ</button>
+      <button class="menu-btn menu-sm green" id="menuShopBtn">🛒 МАГАЗИН</button>
+      <button class="menu-btn menu-sm gold" id="menuBoostBtn">⚡ РОСТ X2 📺</button>
+      <button class="menu-btn menu-sm gold" id="menuRateBtn">⭐ ОЦЕНИТЬ</button>
+    </div>
+  </div>
+  <div class="menu-stats" id="menuStats">ЗАГРУЗКА…</div>
+  <button class="menu-btn menu-sm orange" id="menuRenameBtn" style="max-width:340px;width:100%;min-height:38px;font-size:7px">✏️ СМЕНИТЬ ИМЯ И АВАТАР</button>
+  <!-- ВАЖНО: замените href на ссылку на ВАШУ политику конфиденциальности перед публикацией! -->
+  <a class="privacy-link" href="./privacy.html" target="_blank" rel="noopener">🔒 Политика конфиденциальности</a>
+  <div class="menu-version">v14 • Яндекс Игры</div>
+</div>
+
+<div id="toasts"></div>
+<script>
+'use strict';
+
+// ============= КОНФИГУРАЦИЯ =============
+const SAVE_KEY='garden_save_v12';
+const PLOT_COUNT=15,BASE_PLOTS=6,PRESTIGE_MIN_LEVEL=30,POND_LEVEL=5,AQUA_SIZE=12;
+const AVATARS=['🌱','🌻','🌸','🌹','🍀','🌳','🐶','🐱','🦊','🐼','🐨','🐯','🦁','🐸','🐧','🐉','👑','💎','🌟','⚡','🔥','🌈','🍎','🎮'];
+const XOR_KEY=0x5A;
+const MAX_OFFLINE_MS=4*3600000;
+
+// ============= ШИФРОВАНИЕ СОХРАНЕНИЙ =============
+function encryptSave(str){
+  try{
+    const utf8=unescape(encodeURIComponent(str));
+    let out='';
+    for(let i=0;i<utf8.length;i++)out+=String.fromCharCode(utf8.charCodeAt(i)^XOR_KEY);
+    return btoa(out);
+  }catch(e){return str;}
+}
+function decryptSave(str){
+  try{
+    const raw=atob(str);
+    let out='';
+    for(let i=0;i<raw.length;i++)out+=String.fromCharCode(raw.charCodeAt(i)^XOR_KEY);
+    return decodeURIComponent(escape(out));
+  }catch(e){return null;}
+}
+
+// ============= YANDEX GAMES SDK =============
+let ysdk=null,yPlayer=null,yIsYandex=false,yLang='ru';
+let yLoadingReady=false;
+
+async function initYandexSDK(){
+  // Гасим фоновые отказы SDK вне iframe Яндекса (локальный тест)
+  window.addEventListener('unhandledrejection',e=>{if(String(e.reason&&e.reason.message||'').includes('post message'))e.preventDefault();});
+  if(typeof YaGames==='undefined'){console.log('YaGames SDK not found — fallback mode');return;}
+  try{
+    ysdk=await YaGames.init();
+    yIsYandex=true;
+    yLang=ysdk.environment.i18n.lang||'ru';
+    console.log('Yandex SDK init OK, lang:',yLang);
+    try{yPlayer=await ysdk.getPlayer({scopes:false});console.log('Player:',yPlayer.getName());}catch(e){console.warn('Player init failed:',e);}
+    try{ysdk.features.LoadingAPI.ready();yLoadingReady=true;console.log('Game Ready called');}catch(e){console.warn('LoadingAPI.ready failed:',e);}
+    ysdk.on('game_api_pause',()=>{console.log('GAME PAUSE');if(musicPlaying){stopMusic();document.getElementById('musicToggle').textContent='🔇';}});
+    ysdk.on('game_api_resume',()=>{console.log('GAME RESUME');});
+  }catch(e){console.error('Yandex SDK init error:',e);yIsYandex=false;}
+}
+
+// ============= РЕКЛАМА =============
+// Правила Яндекс Игр: полноэкранную рекламу нельзя показывать в первые минуты сессии
+// и слишком часто. Лимиты: не раньше 2-й минуты сессии, не чаще 1 раза в 3 минуты.
+const sessionStart=Date.now();
+let lastFullscreenAd=0;
+const FS_AD_MIN_SESSION_MS=120000;   // не раньше 2 минут от старта
+const FS_AD_MIN_INTERVAL_MS=180000;  // не чаще раза в 3 минуты
+function canShowFullscreenAd(){
+  if(!yIsYandex||!ysdk)return false;
+  if(Date.now()-sessionStart<FS_AD_MIN_SESSION_MS)return false;
+  if(Date.now()-lastFullscreenAd<FS_AD_MIN_INTERVAL_MS)return false;
+  return true;
+}
+function showFullscreenAd(callback){
+  if(!canShowFullscreenAd()){if(callback)callback();return;}
+  if(musicPlaying)stopMusic();
+  lastFullscreenAd=Date.now();
+  try{
+    ysdk.adv.showFullscreenAdv({callbacks:{onClose:(wasShown)=>{if(callback)callback();},onError:(e)=>{if(callback)callback();}}});
+  }catch(e){if(callback)callback();}
+}
+// Rewarded: награда выдаётся ТОЛЬКО из onRewarded, при ошибке/пропуске — ничего
+function showRewardedAd(onReward){
+  if(!yIsYandex||!ysdk){toast('Реклама недоступна');return;}
+  if(musicPlaying)stopMusic();
+  try{
+    ysdk.adv.showRewardedVideo({callbacks:{onRewarded:()=>{if(onReward)onReward();},onClose:()=>{},onError:()=>toast('Реклама не загрузилась')}});
+  }catch(e){toast('Ошибка рекламы');}
+}
+// Рекламный буст роста x2 на 5 минут
+function adBoostActive(){return state.adBoostUntil&&Date.now()<state.adBoostUntil;}
+function buyAdBoost(){
+  showRewardedAd(()=>{
+    state.adBoostUntil=Math.max(Date.now(),state.adBoostUntil||0)+5*60000;
+    const left=Math.ceil((state.adBoostUntil-Date.now())/60000);
+    toast(`⚡ Рост x2 на ${left} мин!`);
+    showEventBanner('⚡ РЕКЛАМНЫЙ БУСТ РОСТА X2');
+    sfx('levelup');vibrate([30,50,30]);updateHUD();save();
+  });
+}
+
+// ============= ОТЗЫВ И ЯРЛЫК (Yandex) =============
+async function maybeAskReview(){
+  if(!yIsYandex||!ysdk||!ysdk.feedback)return;
+  if(state.reviewAsked)return;
+  try{
+    const res=await ysdk.feedback.canReview();
+    if(res&&res.value){state.reviewAsked=true;save();await ysdk.feedback.requestReview();}
+  }catch(e){}
+}
+async function maybeShowShortcut(){
+  if(!yIsYandex||!ysdk||!ysdk.shortcut)return;
+  try{
+    const res=await ysdk.shortcut.canShowPrompt();
+    if(res&&res.canShow)await ysdk.shortcut.showPrompt();
+  }catch(e){}
+}
+
+// ============= ОБЛАЧНЫЕ СОХРАНЕНИЯ =============
+async function saveToCloud(){
+  if(!yIsYandex||!yPlayer)return false;
+  try{await yPlayer.setData({garden:JSON.stringify(state)},true);return true;}
+  catch(e){console.warn('Cloud save failed:',e);return false;}
+}
+async function loadFromCloud(){
+  if(!yIsYandex||!yPlayer)return null;
+  try{
+    const data=await yPlayer.getData(['garden']);
+    if(data&&data.garden)return JSON.parse(data.garden);
+  }catch(e){console.warn('Cloud load failed:',e);}
+  return null;
+}
+
+// ============= ЛИДЕРБОРДЫ ЯНДЕКСА (с троттлингом) =============
+let lastLbSubmit=0;
+async function submitToYandexLeaderboard(score){
+  if(!yIsYandex||!ysdk)return;
+  if(Date.now()-lastLbSubmit<30000)return; // не чаще раза в 30 сек
+  lastLbSubmit=Date.now();
+  try{
+    await ysdk.leaderboards.setLeaderboardScore('coins_total',score);
+  }catch(e){console.warn('LB submit failed:',e);}
+}
+async function getYandexLeaderboard(){
+  if(!yIsYandex||!ysdk)return null;
+  try{
+    return await ysdk.leaderboards.getLeaderboardEntries('coins_total',{quantityTop:20,includeUser:true,quantityAround:5});
+  }catch(e){console.warn('LB get failed:',e);return null;}
+}
+
+// ============= FIREBASE УДАЛЁН =============
+// Требования Яндекс Игр: игра не должна передавать данные на сторонние серверы.
+// Весь онлайн-функционал — через Yandex SDK (облачные сейвы + лидерборды).
+// fbDB/fbReady оставлены как заглушки: все обращения к Firebase уже защищены проверками.
+let fbDB=null,fbReady=false;
+
+const safeStorage={
+  get(k){try{return localStorage.getItem(k);}catch(e){return null;}},
+  set(k,v){try{localStorage.setItem(k,v);return true;}catch(e){return false;}},
+  remove(k){try{localStorage.removeItem(k);}catch(e){}}
+};
+
+// ============= ИГРОВЫЕ ДАННЫЕ =============
+const PLANTS={carrot:{id:'carrot',emoji:'🥕',name:'Морковь',price:0,growTime:20,reward:2,xp:1,unlock:1},tomato:{id:'tomato',emoji:'🍅',name:'Помидор',price:30,growTime:30,reward:8,xp:2,unlock:1},corn:{id:'corn',emoji:'🌽',name:'Кукуруза',price:200,growTime:50,reward:32,xp:4,unlock:3},pumpkin:{id:'pumpkin',emoji:'🎃',name:'Тыква',price:800,growTime:75,reward:110,xp:8,unlock:5},sunflower:{id:'sunflower',emoji:'🌻',name:'Подсолнух',price:3000,growTime:110,reward:380,xp:15,unlock:8},rose:{id:'rose',emoji:'🌹',name:'Роза',price:10000,growTime:160,reward:1150,xp:30,unlock:11},sakura:{id:'sakura',emoji:'🌸',name:'Сакура',price:35000,growTime:210,reward:3600,xp:50,unlock:15},crystal:{id:'crystal',emoji:'💎',name:'Кристалл',price:120000,growTime:270,reward:12000,xp:90,unlock:19},frost:{id:'frost',emoji:'❄️',name:'Морозник',price:400000,growTime:330,reward:40000,xp:160,unlock:24},golden:{id:'golden',emoji:'🌟',name:'Золотой',price:0,growTime:60,reward:4000,xp:120,special:true},carrot_tomato:{id:'carrot_tomato',emoji:'🥕🍅',name:'Морк.томат',price:0,growTime:45,reward:60,xp:5,unlock:1,hybrid:true},corn_pumpkin:{id:'corn_pumpkin',emoji:'🌽🎃',name:'Кукур.тыква',price:0,growTime:90,reward:350,xp:12,unlock:1,hybrid:true},sunflower_rose:{id:'sunflower_rose',emoji:'🌻🌹',name:'Солн.роза',price:0,growTime:150,reward:2200,xp:35,unlock:1,hybrid:true},sakura_rose:{id:'sakura_rose',emoji:'🌸🌹',name:'Сакур.роза',price:0,growTime:200,reward:6000,xp:70,unlock:1,hybrid:true},crystal_frost:{id:'crystal_frost',emoji:'💎❄️',name:'Лед.кристалл',price:0,growTime:280,reward:30000,xp:150,unlock:1,hybrid:true}};
+const UPGRADES={autoWater:{name:'Автополив',desc:'Поливает грядку',maxLevel:8,basePrice:500,mult:2.2,icon:'💧'},waterPower:{name:'Сила полива',desc:'+2 к тапу',maxLevel:8,basePrice:300,mult:2.3,icon:'🌊'},reward:{name:'Щедрость',desc:'+12% монет',maxLevel:10,basePrice:800,mult:2.5,icon:'💎'},plots:{name:'Грядки',desc:'+1 грядка',maxLevel:9,basePrice:2000,mult:3.0,icon:'🪴'},luck:{name:'Удача',desc:'+1% золотое',maxLevel:8,basePrice:3000,mult:2.5,icon:'🍀'},speed:{name:'Скорость',desc:'+8% рост',maxLevel:8,basePrice:1000,mult:2.4,icon:'⏩'}};
+const PETS={none:{id:'none',name:'Без питомца',icon:'❌',price:0,desc:'Не помогает'},dog:{id:'dog',name:'Собака',icon:'🐶',price:5000,desc:'Собирает урожай',ability:'harvest',interval:15},cat:{id:'cat',name:'Кот',icon:'🐱',price:12000,desc:'Поливает 2',ability:'water',interval:12,targets:2},parrot:{id:'parrot',name:'Попугай',icon:'🦜',price:40000,desc:'Золотые семена',ability:'golden',interval:60},bee:{id:'bee',name:'Пчела',icon:'🐝',price:150000,desc:'Ускоряет рост',ability:'haste',interval:1},dragon:{id:'dragon',name:'Дракон',icon:'🐲',price:2000000,desc:'Всё вместе',ability:'all',interval:8}};
+const SEASONS=[{id:'spring',name:'Весна',icon:'🌸',boost:['carrot','rose','sakura']},{id:'summer',name:'Лето',icon:'☀️',boost:['tomato','corn','sunflower']},{id:'autumn',name:'Осень',icon:'🍂',boost:['pumpkin']},{id:'winter',name:'Зима',icon:'❄️',boost:['crystal','frost']}];
+const WEATHERS={clear:{id:'clear',name:'Ясно',icon:'☀️',growMult:1.0,coinMult:1.0,weight:50},rain:{id:'rain',name:'Дождь',icon:'🌧️',growMult:1.5,coinMult:1.0,weight:25,fishBonus:1.3},drought:{id:'drought',name:'Засуха',icon:'🏜️',growMult:0.7,coinMult:1.2,weight:15,fishBonus:0.8},storm:{id:'storm',name:'Гроза',icon:'⛈️',growMult:2.0,coinMult:1.5,weight:8,fishBonus:1.5},rainbow:{id:'rainbow',name:'Радуга',icon:'🌈',growMult:1.3,coinMult:2.0,weight:2,fishBonus:2.0}};
+const SKINS={forest:{id:'forest',name:'Лес',icon:'🌳',price:0,sky1:'#3CBCFC',sky2:'#A4E4FC',ground:'#58D854'},beach:{id:'beach',name:'Пляж',icon:'🏖️',price:20000,sky1:'#F8B800',sky2:'#A4E4FC',ground:'#F8B800'},night:{id:'night',name:'Ночь',icon:'🌙',price:80000,sky1:'#0000FC',sky2:'#0078F8',ground:'#005800'},sakura:{id:'sakura',name:'Сакура',icon:'🌸',price:250000,sky1:'#FCBCB0',sky2:'#F8F8F8',ground:'#58D854'},space:{id:'space',name:'Космос',icon:'🌌',price:1000000,sky1:'#000',sky2:'#6844FC',ground:'#A800A8'},village:{id:'village',name:'Деревня',icon:'🏡',price:5000000,sky1:'#A4E4FC',sky2:'#F8F8F8',ground:'#00A800'}};
+const ACHIEVEMENTS=[{id:'firstHarvest',name:'Первый урожай',desc:'1 растение',icon:'🌱',target:1,type:'harvest',reward:50},{id:'tenHarvest',name:'Опытный',desc:'10 растений',icon:'🌿',target:10,type:'harvest',reward:200},{id:'hundred',name:'Фермер',desc:'100 растений',icon:'🌳',target:100,type:'harvest',reward:2000},{id:'thousand',name:'Плантатор',desc:'1000',icon:'🏞️',target:1000,type:'harvest',reward:20000},{id:'rich',name:'Богач',desc:'5000 монет',icon:'💎',target:5000,type:'coins',reward:500},{id:'millionaire',name:'Миллионер',desc:'100000',icon:'👑',target:100000,type:'coins',reward:10000},{id:'level10',name:'Мастер',desc:'10 уровень',icon:'⭐',target:10,type:'level',reward:1000},{id:'level25',name:'Легенда',desc:'25 уровень',icon:'✨',target:25,type:'level',reward:5000},{id:'golden',name:'Золотая жила',desc:'Золотое',icon:'🌟',target:1,type:'golden',reward:3000},{id:'petsAll',name:'Зоопарк',desc:'Все питомцы',icon:'🦁',target:4,type:'pets',reward:8000},{id:'hybrid',name:'Селекционер',desc:'Гибрид',icon:'⚒️',target:1,type:'hybrid',reward:2000},{id:'fisher1',name:'Первый улов',desc:'1 рыба',icon:'🎣',target:1,type:'fish',reward:200},{id:'fisher10',name:'Рыбак',desc:'10 рыб',icon:'🐟',target:10,type:'fish',reward:1500},{id:'fisher100',name:'Мастер-рыбак',desc:'100 рыб',icon:'🐠',target:100,type:'fish',reward:10000},{id:'legendary',name:'Легенда',desc:'Осётр',icon:'👑',target:1,type:'sturgeon',reward:15000},{id:'aqua5',name:'Коллекционер',desc:'5 в аквариум',icon:'🐠',target:5,type:'aqua',reward:5000},{id:'aquaAll',name:'Ихтиолог',desc:'10 видов',icon:'🧪',target:10,type:'aqua',reward:50000}];
+const DAILY_POOL=[{icon:'💰',reward:100},{icon:'💰',reward:250},{icon:'💎',reward:500},{icon:'💰',reward:800},{icon:'💎',reward:1200},{icon:'🎁',reward:2000},{icon:'🏆',reward:5000},{icon:'💰',reward:300},{icon:'💎',reward:700},{icon:'🎁',reward:1500},{icon:'💰',reward:400},{icon:'💎',reward:900},{icon:'🌟',reward:3000},{icon:'🎁',reward:2500},{icon:'💰',reward:600}];
+const QUEST_POOL=[{id:'harvest5',type:'harvest',target:5,name:'Собери 5',reward:200},{id:'harvest15',type:'harvest',target:15,name:'Собери 15',reward:600},{id:'harvest30',type:'harvest',target:30,name:'Собери 30',reward:1500},{id:'earn500',type:'earn',target:500,name:'Заработай 500',reward:250},{id:'earn2000',type:'earn',target:2000,name:'Заработай 2000',reward:1000},{id:'earn10000',type:'earn',target:10000,name:'Заработай 10000',reward:5000},{id:'water10',type:'water',target:10,name:'Полей 10',reward:150},{id:'plant8',type:'plant',target:8,name:'Посади 8',reward:300},{id:'golden1',type:'golden',target:1,name:'Золотое',reward:2000},{id:'fish3',type:'fish',target:3,name:'3 рыбы',reward:400},{id:'fish10',type:'fish',target:10,name:'10 рыб',reward:1500}];
+const NPC_QUEST_CHAIN=[{day:1,name:'Собери 10 растений',type:'harvest',target:10,reward:500,icon:'🌾'},{day:2,name:'Заработай 1000 монет',type:'earn',target:1000,reward:800,icon:'💰'},{day:3,name:'Полей 20 раз',type:'water',target:20,reward:700,icon:'💧'},{day:4,name:'Поймай 5 рыб',type:'fish',target:5,reward:1200,icon:'🎣'},{day:5,name:'Создай гибрид',type:'hybrid',target:1,reward:2000,icon:'⚒️'},{day:6,name:'Собери золотое',type:'golden',target:1,reward:3500,icon:'🌟'},{day:7,name:'Собери 100 растений',type:'harvest',target:100,reward:10000,icon:'👑'}];
+const HYBRIDS={carrot_tomato:{id:'carrot_tomato',name:'Морк.томат',icon:'🥕🍅',recipe:{carrot:3,tomato:1},reward:60,growTime:45,xp:5},corn_pumpkin:{id:'corn_pumpkin',name:'Кукур.тыква',icon:'🌽🎃',recipe:{corn:3,pumpkin:1},reward:350,growTime:90,xp:12},sunflower_rose:{id:'sunflower_rose',name:'Солн.роза',icon:'🌻🌹',recipe:{sunflower:2,rose:1},reward:2200,growTime:150,xp:35},sakura_rose:{id:'sakura_rose',name:'Сакур.роза',icon:'🌸🌹',recipe:{sakura:1,rose:2},reward:6000,growTime:200,xp:70},crystal_frost:{id:'crystal_frost',name:'Лед.кристалл',icon:'💎❄️',recipe:{crystal:1,frost:2},reward:30000,growTime:280,xp:150}};
+const PRESTIGE_SHOP={grow:{id:'grow',name:'Бож.рост',icon:'🌱',cost:1,desc:'+25% рост',max:3},coin:{id:'coin',name:'Зол.жила',icon:'💰',cost:1,desc:'+50% монет',max:3},auto:{id:'auto',name:'Автополив',icon:'💧',cost:2,desc:'Всегда',max:1},luck:{id:'luck',name:'Абс.удача',icon:'🍀',cost:2,desc:'+5% золотое',max:3},slots:{id:'slots',name:'Райский сад',icon:'🪴',cost:3,desc:'+3 грядки',max:3}};
+const HOUSE_LEVELS=[{level:0,cost:0,rate:0,name:'Нет домика',icon:'🏚️'},{level:1,cost:5000,rate:10,name:'Сарай',icon:'🏠'},{level:2,cost:25000,rate:60,name:'Ферма',icon:'🏡'},{level:3,cost:150000,rate:400,name:'Поместье',icon:'🏘️'},{level:4,cost:1000000,rate:3000,name:'Усадьба',icon:'🏛️'},{level:5,cost:10000000,rate:25000,name:'Дворец',icon:'🏰'}];
+const SEASONAL_EVENTS=[{id:'gp',name:'Зол.тыква',icon:'🎃✨',plant:'pumpkin',mult:5},{id:'rc',name:'Радуж.кристалл',icon:'💎🌈',plant:'crystal',mult:5},{id:'fr',name:'Морозная роза',icon:'🌹❄️',plant:'rose',mult:5},{id:'sf',name:'Сакур.иней',icon:'🌸❄️',plant:'sakura',mult:5}];
+const BOSS_REWARD=20000;
+const WEEK_PRIZES=[{stars:5,coins:50000,medal:'🥇',place:'1-е место'},{stars:3,coins:20000,medal:'🥈',place:'2-е место'},{stars:1,coins:5000,medal:'🥉',place:'3-е место'}];
+const FISH=[{id:'sardine',name:'Сардинка',icon:'🐟',price:50,weight:40,rarity:'common'},{id:'perch',name:'Окунь',icon:'🐠',price:150,weight:25,rarity:'common'},{id:'trout',name:'Форель',icon:'🐡',price:400,weight:15,rarity:'uncommon'},{id:'salmon',name:'Лосось',icon:'🍣',price:1200,weight:8,rarity:'uncommon'},{id:'pike',name:'Щука',icon:'🦈',price:3500,weight:5,rarity:'rare'},{id:'catfish',name:'Сом',icon:'🐋',price:9000,weight:3,rarity:'rare'},{id:'goldfish',name:'Золот.рыбка',icon:'🌟',price:25000,weight:2,rarity:'epic'},{id:'octopus',name:'Осьминог',icon:'🐙',price:60000,weight:1.5,rarity:'epic'},{id:'sturgeon',name:'Осётр',icon:'👑',price:200000,weight:0.5,rarity:'legendary'}];
+const GOLD_FISH=[{id:'diamond_fish',name:'Бриллиант',icon:'💎',price:500000,weight:40,rarity:'rare'},{id:'rainbow_carp',name:'Радуж.карп',icon:'🌈',price:1500000,weight:25,rarity:'epic'},{id:'imperial',name:'Импер.осётр',icon:'👑👑',price:5000000,weight:10,rarity:'legendary'},{id:'cosmic_fish',name:'Космо-рыба',icon:'🌌',price:20000000,weight:3,rarity:'mythic'}];
+const RODS=[{level:0,name:'Бамбуковая',icon:'🎣',cost:0,bonus:0,luck:0,unlock:5},{level:1,name:'Деревянная',icon:'🎣',cost:2000,bonus:0.10,luck:0,unlock:5},{level:2,name:'Спиннинг',icon:'🎣',cost:15000,bonus:0.25,luck:0,unlock:10},{level:3,name:'Профи',icon:'🎣',cost:150000,bonus:0.50,luck:1,unlock:15},{level:4,name:'Золотая',icon:'🏆',cost:2000000,bonus:1.00,luck:2,unlock:20},{level:5,name:'Космическая',icon:'🚀',cost:50000000,bonus:2.00,luck:3,unlock:0,prestige:true}];
+
+// ============= СОСТОЯНИЕ =============
+function defaultState(){
+  return {
+    coins:5,level:1,xp:0,day:1,
+    ownedSeeds:['carrot'],equipped:'carrot',
+    upgrades:{autoWater:0,waterPower:0,reward:0,plots:0,luck:0,speed:0},
+    plots:Array.from({length:PLOT_COUNT},()=>({seed:null,progress:0,golden:false})),
+    ownedPets:['none'],activePet:'none',
+    ownedSkins:['forest'],activeSkin:'forest',
+    achievements:{},claimedAchievements:{},
+    quests:{day:0,list:[]},
+    npcQuests:{day:1,progress:{},completed:[],startDate:Date.now()},
+    prestige:0,prestigeStars:0,prestigePurchases:{},
+    playerName:'',avatar:'🌱',inventory:{},hybridSeeds:[],hybridInventory:{},
+    houseLevel:0,houseAccum:0,houseLastTick:Date.now(),
+    eventActive:null,eventEnds:0,
+    bossActive:false,bossProgress:0,bossDay:0,
+    fishing:{rodLevel:0,totalCaught:0,bestFish:null,bestPrice:0,cooldownUntil:0,zone:1},
+    aquarium:{},
+    records:{bestHarvest:0,bestFishPrice:0,longestStreak:0,currentStreak:0,lastPlayDay:0,totalPlayDays:0,maxCoins:5,bossKilled:0,weatherEvents:0},
+    stats:{totalHarvest:0,totalEarned:0,totalGolden:0,lastDailyClaim:0,lastDailySlot:-1,dailyClaimCount:0,weeklyEarned:0,weeklyStart:Date.now(),bestHarvest:0},
+    weather:{id:'clear',changedAt:Date.now()},
+    season:{idx:0,changedAt:Date.now()},
+    rewards:{lastCheckedWeek:0},
+    offline:{pendingScore:null,cachedLbAll:null,cachedLbSeason:null,cachedLbAllWeek:0,cachedLbSeasonWeek:0,lastLbFetch:0,isOffline:false},
+    timeGuard:{lastKnown:Date.now(),warned:false,blockUntil:0},
+    lastSaveCoins:5,
+    welcomeShown:false,
+    adBoostUntil:0,
+    reviewAsked:false,
+    lastSave:Date.now()
+  };
+}
+let state=defaultState();
+
+if(fbReady&&fbDB){
+  try{
+    fbDB.ref('.info/connected').on('value',snap=>{
+      const connected=snap.val()===true;
+      const wasOffline=state.offline.isOffline;
+      state.offline.isOffline=!connected;
+      if(connected&&wasOffline){try{flushOfflineQueue();}catch(e){}}
+      try{updateOfflineBadge();}catch(e){}
+    });
+  }catch(e){console.warn('conn listener failed',e);}
+}
+
+// ============= СОХРАНЕНИЕ (с шифрованием и аудитом) =============
+function save(){
+  state.lastSave=Date.now();
+  if(!state.timeGuard)state.timeGuard={lastKnown:Date.now(),warned:false,blockUntil:0};
+  state.timeGuard.lastKnown=Date.now();
+  state.lastSaveCoins=state.coins;
+  try{
+    const json=JSON.stringify(state);
+    const enc=encryptSave(json);
+    safeStorage.set(SAVE_KEY,enc);
+  }catch(e){console.warn('Save failed:',e);}
+  if(yIsYandex)saveToCloud();
+}
+
+function load(){
+  try{
+    const raw=safeStorage.get(SAVE_KEY);
+    if(!raw)return null;
+    // Пробуем расшифровать
+    let json=decryptSave(raw);
+    if(!json){
+      // Fallback: старое сохранение было plain JSON
+      try{JSON.parse(raw);json=raw;}catch(e){return null;}
+    }
+    const data=JSON.parse(json);
+    if(!data||typeof data!=='object')return null;
+    const def=defaultState();
+    const merged=Object.assign(def,data,{
+      upgrades:Object.assign(def.upgrades,data.upgrades||{}),
+      stats:Object.assign(def.stats,data.stats||{}),
+      weather:Object.assign(def.weather,data.weather||{}),
+      season:Object.assign(def.season,data.season||{}),
+      quests:Object.assign(def.quests,data.quests||{}),
+      npcQuests:Object.assign(def.npcQuests,data.npcQuests||{}),
+      prestigePurchases:Object.assign(def.prestigePurchases,data.prestigePurchases||{}),
+      inventory:Object.assign(def.inventory,data.inventory||{}),
+      hybridInventory:Object.assign(def.hybridInventory,data.hybridInventory||{}),
+      claimedAchievements:Object.assign(def.claimedAchievements,data.claimedAchievements||{}),
+      fishing:Object.assign(def.fishing,data.fishing||{}),
+      aquarium:Object.assign(def.aquarium,data.aquarium||{}),
+      records:Object.assign(def.records,data.records||{}),
+      rewards:Object.assign(def.rewards,data.rewards||{}),
+      offline:Object.assign(def.offline,data.offline||{}),
+      timeGuard:Object.assign(def.timeGuard,data.timeGuard||{})
+    });
+    if(!Array.isArray(merged.plots)||merged.plots.length!==PLOT_COUNT){
+      merged.plots=Array.from({length:PLOT_COUNT},()=>({seed:null,progress:0,golden:false}));
+    }
+    if(typeof merged.coins!=='number'||isNaN(merged.coins))merged.coins=5;
+    if(typeof merged.level!=='number'||merged.level<1)merged.level=1;
+    if(typeof merged.xp!=='number'||isNaN(merged.xp))merged.xp=0;
+    if(!Array.isArray(merged.ownedSeeds)||!merged.ownedSeeds.length)merged.ownedSeeds=['carrot'];
+    if(!merged.equipped||!PLANTS[merged.equipped])merged.equipped='carrot';
+    if(!Array.isArray(merged.ownedPets)||!merged.ownedPets.length)merged.ownedPets=['none'];
+    if(!merged.activePet||!PETS[merged.activePet])merged.activePet='none';
+    if(!Array.isArray(merged.ownedSkins)||!merged.ownedSkins.length)merged.ownedSkins=['forest'];
+    if(!merged.activeSkin||!SKINS[merged.activeSkin])merged.activeSkin='forest';
+    if(!merged.weather||!WEATHERS[merged.weather.id])merged.weather={id:'clear',changedAt:Date.now()};
+    if(!merged.season||typeof merged.season.idx!=='number')merged.season={idx:0,changedAt:Date.now()};
+    if(!merged.quests||!Array.isArray(merged.quests.list))merged.quests={day:0,list:[]};
+    if(!merged.npcQuests||typeof merged.npcQuests!=='object')merged.npcQuests={day:1,progress:{},completed:[],startDate:Date.now()};
+    if(!Array.isArray(merged.npcQuests.completed))merged.npcQuests.completed=[];
+    if(typeof merged.npcQuests.progress!=='object'||merged.npcQuests.progress===null)merged.npcQuests.progress={};
+    if(!Array.isArray(merged.hybridSeeds))merged.hybridSeeds=[];
+    if(typeof merged.hybridInventory!=='object'||merged.hybridInventory===null)merged.hybridInventory={};
+    if(typeof merged.inventory!=='object'||merged.inventory===null)merged.inventory={};
+    if(typeof merged.aquarium!=='object'||merged.aquarium===null)merged.aquarium={};
+    if(typeof merged.achievements!=='object'||merged.achievements===null)merged.achievements={};
+    if(typeof merged.claimedAchievements!=='object'||merged.claimedAchievements===null)merged.claimedAchievements={};
+    if(!merged.fishing||typeof merged.fishing!=='object')merged.fishing=def.fishing;
+    if(!merged.records||typeof merged.records!=='object')merged.records=def.records;
+    if(typeof merged.stats!=='object'||merged.stats===null)merged.stats=def.stats;
+    if(typeof merged.avatar!=='string'||!merged.avatar)merged.avatar='🌱';
+    if(typeof merged.rewards!=='object'||merged.rewards===null)merged.rewards={lastCheckedWeek:0};
+    if(typeof merged.rewards.lastCheckedWeek!=='number')merged.rewards.lastCheckedWeek=0;
+    if(typeof merged.offline!=='object'||merged.offline===null)merged.offline=def.offline;
+    if(typeof merged.timeGuard!=='object'||merged.timeGuard===null)merged.timeGuard=def.timeGuard;
+    if(typeof merged.lastSaveCoins!=='number')merged.lastSaveCoins=merged.coins;
+    const p=PLANTS[merged.equipped];
+    if(p&&p.hybrid&&!(merged.hybridInventory[merged.equipped]>0)){merged.equipped='carrot';}
+    return merged;
+  }catch(e){console.warn('Load error:',e);return null;}
+}
+
+// ============= ХЕЛПЕРЫ =============
+function currentPlotsCount(){return Math.min(PLOT_COUNT,BASE_PLOTS+state.upgrades.plots+(state.prestigePurchases.slots||0)*3);}
+function waterPower(){return 10+state.upgrades.waterPower*2;}
+function currentWeather(){return WEATHERS[state.weather.id]||WEATHERS.clear;}
+function currentSeason(){return SEASONS[state.season.idx]||SEASONS[0];}
+function prestigeMult(){return 1+state.prestige*0.10;}
+function prestigeGrowBonus(){return 1+(state.prestigePurchases.grow||0)*0.25;}
+function prestigeCoinBonus(){return 1+(state.prestigePurchases.coin||0)*0.50;}
+function aquaBonus(){return 1+Object.keys(state.aquarium).length*0.01;}
+function isNight(){const h=new Date().getHours();return h>=22||h<6;}
+function nightMult(){return isNight()?1.5:1.0;}
+function nightCoinMult(){return isNight()?1.2:1.0;}
+function rewardMult(){return(1+state.upgrades.reward*0.12)*currentWeather().coinMult*prestigeMult()*prestigeCoinBonus()*nightCoinMult()*aquaBonus();}
+function speedMult(){return(1+state.upgrades.speed*0.08)*prestigeGrowBonus()*(adBoostActive()?2:1);}
+function goldenChance(){return 0.01+state.upgrades.luck*0.01+(state.prestigePurchases.luck||0)*0.05;}
+function seasonBoost(id){return currentSeason().boost.includes(id)?1.5:1.0;}
+function xpForLevel(lvl){return Math.round(20*Math.pow(lvl,1.5));}
+function getEventBonus(id){if(!state.eventActive||Date.now()>state.eventEnds)return 1;if(state.eventActive.plant===id)return state.eventActive.mult;return 1;}
+function dailySlot(){return Math.floor(Date.now()/(4*3600000));}
+function canClaimDaily(){
+  if(state.timeGuard&&state.timeGuard.blockUntil&&Date.now()<state.timeGuard.blockUntil)return false;
+  return state.stats.lastDailySlot!==dailySlot();
+}
+function currentDailyReward(){return DAILY_POOL[dailySlot()%DAILY_POOL.length];}
+function unclaimedQuests(){return state.quests.list.filter(q=>q.done&&!q.claimed).length;}
+function unclaimedAchievements(){return ACHIEVEMENTS.filter(a=>state.achievements[a.id]&&!state.claimedAchievements[a.id]).length;}
+function unclaimedCraft(){return Object.values(HYBRIDS).filter(h=>Object.keys(h.recipe).every(k=>(state.inventory[k]||0)>=h.recipe[k])).length;}
+function canFish(){return state.level>=POND_LEVEL;}
+function goldPondUnlocked(){return state.prestige>=1;}
+function currentNpcQuest(){return NPC_QUEST_CHAIN.find(q=>q.day===state.npcQuests.day);}
+function seasonWeek(){const d=new Date();const start=new Date(d.getFullYear(),0,1);const days=Math.floor((d-start)/86400000);return Math.floor(days/7)+1;}
+function seasonEndTime(){const d=new Date();const day=d.getDay()||7;const end=new Date(d);end.setDate(d.getDate()+(7-day));end.setHours(23,59,59,999);return end.getTime();}
+
+function updateStreak(){
+  const today=Math.floor(Date.now()/86400000);
+  if(state.records.lastPlayDay!==today){
+    if(state.records.lastPlayDay===today-1)state.records.currentStreak++;
+    else state.records.currentStreak=1;
+    state.records.lastPlayDay=today;
+    state.records.totalPlayDays++;
+    state.records.longestStreak=Math.max(state.records.longestStreak,state.records.currentStreak);
+  }
+}
+
+// ============= ЗАЩИТА ОТ ЧАСОВ =============
+function checkTimeGuard(){
+  const now=Date.now();
+  const last=state.timeGuard?.lastKnown||now;
+  const diff=now-last;
+
+  // Откат назад более чем на минуту — читерство
+  if(diff<-60000){
+    const mins=Math.round(-diff/60000);
+    console.warn('⏰ Time rollback detected:',mins,'min');
+    state.timeGuard.warned=true;
+    state.timeGuard.blockUntil=now+300000; // блокируем бонусы на 5 минут
+    // Откатываем "незаконные" монеты
+    const stolen=Math.floor(state.coins*0.15);
+    state.coins=Math.max(5,state.coins-stolen);
+    state.stats.totalEarned=Math.max(0,state.stats.totalEarned-stolen);
+    state.timeGuard.lastKnown=now;
+    setTimeout(()=>{
+      showEventBanner('⚠️ ОБНАРУЖЕН СБОЙ ВРЕМЕНИ');
+      setTimeout(()=>showEventBanner(`⚠️ -${stolen.toLocaleString('ru-RU')}💰`),1600);
+    },500);
+  }
+  // Большой прыжок вперёд — капаем оффлайн-прирост
+  else if(diff>MAX_OFFLINE_MS){
+    console.warn('⏰ Large forward jump:',Math.round(diff/3600000),'h — capped');
+  }
+
+  state.timeGuard.lastKnown=now;
+}
+
+// ============= ОФФЛАЙН-РОСТ (с капом) =============
+function applyOfflineGrowth(){
+  const elapsed=(Date.now()-state.lastSave)/1000;
+  if(elapsed<30)return;
+  const capped=Math.min(elapsed,MAX_OFFLINE_MS/1000);
+  let grown=0;
+  state.plots.forEach(p=>{
+    if(p&&p.seed&&p.progress<100){
+      const plant=PLANTS[p.seed];
+      if(!plant)return;
+      const rate=(100/(plant.growTime*2))*0.2;
+      p.progress=Math.min(100,p.progress+rate*capped);
+      if(p.progress>=100)grown++;
+    }
+  });
+  if(grown>0)setTimeout(()=>toast(`Выросло: ${grown}`),900);
+}
+
+// ============= ИГРОВЫЕ ДЕЙСТВИЯ =============
+function plant(i){
+  const p=state.plots[i];
+  if(!p||p.seed)return;
+  const plantData=PLANTS[state.equipped];
+  if(!plantData||!state.ownedSeeds.includes(state.equipped)){toast('Семя не куплено');return;}
+  if(plantData.hybrid){
+    const have=state.hybridInventory[state.equipped]||0;
+    if(have<=0){toast('Нет семян');sfx('error');return;}
+    state.hybridInventory[state.equipped]=have-1;
+  }
+  p.seed=state.equipped;p.progress=0;
+  p.golden=Math.random()<goldenChance();
+  if(p.golden)toast('Золотое!');
+  sfx('plant');vibrate(8);updateQuestProgress('plant',1);save();
+}
+function water(i){
+  const p=state.plots[i];
+  if(!p||!p.seed||p.progress>=100)return;
+  p.progress=Math.min(100,p.progress+waterPower());
+  spawnWaterDrops(i);sfx('water');vibrate(5);
+  if(p.progress>=100)sfx('ready');
+  updateQuestProgress('water',1);updateNpcProgress('water',1);
+}
+function harvest(i){
+  const p=state.plots[i];
+  if(!p||!p.seed||p.progress<100)return;
+  const plant=PLANTS[p.seed];
+  if(!plant)return;
+  let earn=Math.round(plant.reward*rewardMult()*getEventBonus(p.seed));
+  if(p.golden){earn*=10;state.stats.totalGolden++;toast(`+${earn.toLocaleString('ru-RU')}`);}
+  else toast(`+${earn.toLocaleString('ru-RU')}`);
+  state.coins+=earn;
+  state.stats.totalEarned+=earn;
+  state.stats.weeklyEarned+=earn;
+  state.stats.totalHarvest++;
+  state.stats.bestHarvest=Math.max(state.stats.bestHarvest,earn);
+  state.records.bestHarvest=Math.max(state.records.bestHarvest,earn);
+  state.records.maxCoins=Math.max(state.records.maxCoins,state.coins);
+  if(!state.inventory[p.seed])state.inventory[p.seed]=0;
+  state.inventory[p.seed]++;
+  if(plant.hybrid){
+    let seedsBack=1;
+    const bonusChance=plant.reward>=5000?0.50:0.30;
+    if(Math.random()<bonusChance)seedsBack++;
+    state.hybridInventory[p.seed]=(state.hybridInventory[p.seed]||0)+seedsBack;
+    if(seedsBack>1)setTimeout(()=>toast(`+${seedsBack} семян!`),800);
+    updateNpcProgress('hybrid',1);
+  }
+  addXP(plant.xp*(p.golden?3:1));
+  spawnCoinBurst(i,earn);
+  sfx('harvest');vibrate([10,30,10]);
+  updateQuestProgress('harvest',1);updateQuestProgress('earn',earn);
+  updateNpcProgress('harvest',1);updateNpcProgress('earn',earn);
+  if(p.golden){updateQuestProgress('golden',1);updateNpcProgress('golden',1);}
+  p.seed=null;p.progress=0;p.golden=false;
+  checkAchievements();submitScore();save();
+}
+function tapPlot(i){const p=state.plots[i];if(!p)return;if(!p.seed)plant(i);else if(p.progress<100)water(i);else harvest(i);}
+function addXP(amount){
+  state.xp+=amount;
+  while(state.xp>=xpForLevel(state.level)){
+    state.xp-=xpForLevel(state.level);
+    state.level++;
+    const bonus=20+state.level*5;
+    state.coins+=bonus;
+    toast(`Ур.${state.level}! +${bonus}`);
+    sfx('levelup');
+    // Просим отзыв/ярлык на «счастливых» уровнях — это растёт рейтинг игры в каталоге
+    if(state.level===5){maybeAskReview();maybeShowShortcut();}
+    if(state.level===10)maybeAskReview();
+    if(state.level===POND_LEVEL){
+      setTimeout(()=>{showEventBanner('🎣 ПРУД ОТКРЫТ!');setTimeout(()=>showEventBanner('ЛОВИ РЫБУ → АКВАРИУМ!'),1800);},1500);
+    }
+  }
+  updateHUD();
+}
+function rollWeather(){
+  const total=Object.values(WEATHERS).reduce((s,w)=>s+w.weight,0);
+  let r=Math.random()*total;
+  for(const w of Object.values(WEATHERS)){r-=w.weight;if(r<=0){state.weather={id:w.id,changedAt:Date.now()};return;}}
+  state.weather={id:'clear',changedAt:Date.now()};
+}
+function changeSeason(){state.season.idx=(state.season.idx+1)%SEASONS.length;state.season.changedAt=Date.now();showEventBanner(`${currentSeason().name}!`);}
+const EVENTS=[
+  {name:'Радуга! x2',apply:()=>{state.weather.id='rainbow';state.weather.changedAt=Date.now();}},
+  {name:'Метеорит!',apply:()=>{state.plots.forEach(p=>{if(p&&p.seed&&p.progress<100)p.progress=100;});}},
+  {name:'Клад +2000',apply:()=>{state.coins+=2000;}},
+];
+function tryRandomEvent(){
+  if(Math.random()<0.12){
+    const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+    showEventBanner(ev.name);ev.apply();
+    state.records.weatherEvents++;
+    sfx('reward');vibrate([30,50,30]);updateHUD();save();
+  }
+}
+function trySeasonalEvent(){
+  if(state.eventActive&&Date.now()<state.eventEnds)return;
+  if(Math.random()<0.20){
+    const ev=SEASONAL_EVENTS[Math.floor(Math.random()*SEASONAL_EVENTS.length)];
+    state.eventActive=ev;state.eventEnds=Date.now()+24*3600000;
+    showEventBanner(`${ev.icon} x${ev.mult}`);sfx('reward');vibrate([30,60,30]);save();
+  }
+}
+function trySpawnBoss(){
+  const today=Math.floor(Date.now()/86400000);
+  if(state.bossDay===today||state.bossActive)return;
+  if(Math.random()<0.3){
+    state.bossActive=true;state.bossProgress=0;state.bossDay=today;
+    showEventBanner('БОСС!');sfx('levelup');vibrate([50,100,50]);save();
+  }
+}
+function waterBoss(){
+  if(!state.bossActive)return;
+  state.bossProgress=Math.min(100,state.bossProgress+waterPower()*0.5);
+  if(state.bossProgress>=100){
+    const reward=Math.round(BOSS_REWARD*rewardMult());
+    state.coins+=reward;state.stats.totalEarned+=reward;
+    state.bossActive=false;state.bossProgress=0;
+    state.records.bossKilled++;
+    toast(`+${reward.toLocaleString('ru-RU')}`);
+    sfx('levelup');vibrate([100,50,100,50,100]);
+  }
+  save();
+}
+function showEventBanner(text){
+  const el=document.createElement('div');el.className='event-banner';el.textContent=text;
+  document.body.appendChild(el);
+  setTimeout(()=>{el.style.transition='opacity .4s';el.style.opacity='0';setTimeout(()=>el.remove(),400);},2800);
+}
+let petTick={dog:0,cat:0,parrot:0,bee:0,dragon:0};
+function processPet(petId,dt){
+  const pet=PETS[petId];
+  if(!pet||pet.id==='none')return;
+  petTick[petId]=(petTick[petId]||0)+dt;
+  if(petTick[petId]<pet.interval)return;
+  petTick[petId]=0;
+  const growing=state.plots.map((p,i)=>({p,i})).filter(o=>o.p&&o.p.seed&&o.p.progress<100);
+  const ready=state.plots.map((p,i)=>({p,i})).filter(o=>o.p&&o.p.seed&&o.p.progress>=100&&i<currentPlotsCount());
+  switch(pet.ability){
+    case 'harvest':if(ready.length)harvest(ready[0].i);break;
+    case 'water':for(let k=0;k<(pet.targets||1)&&growing.length;k++)water(growing[Math.floor(Math.random()*growing.length)].i);break;
+    case 'golden':if(Math.random()<0.25){const empty=state.plots.map((p,i)=>({p,i})).filter(o=>o.p&&!o.p.seed&&o.i<currentPlotsCount());if(empty.length){const i=empty[0].i;state.plots[i].seed='golden';state.plots[i].golden=true;state.plots[i].progress=0;toast(`${pet.icon} Золотое`);}}break;
+    case 'haste':state.plots.forEach(p=>{if(p&&p.seed&&p.progress<100)p.progress=Math.min(100,p.progress+0.5);});break;
+    case 'all':if(ready.length)harvest(ready[0].i);growing.slice(0,3).forEach(o=>water(o.i));state.plots.forEach(p=>{if(p&&p.seed&&p.progress<100)p.progress=Math.min(100,p.progress+1);});break;
+  }
+}
+function updateQuestProgress(type,amount){
+  let changed=false;
+  state.quests.list.forEach(q=>{
+    if(q.type===type&&!q.done){
+      q.progress=(q.progress||0)+amount;
+      if(q.progress>=q.target){q.done=true;toast(`${q.name}!`);sfx('reward');changed=true;}
+    }
+  });
+  if(changed){updateHUD();save();}
+}
+function updateNpcProgress(type,amount){
+  const q=currentNpcQuest();
+  if(!q||q.type!==type)return;
+  if(state.npcQuests.completed.includes(q.day))return;
+  state.npcQuests.progress[type]=(state.npcQuests.progress[type]||0)+amount;
+  if(state.npcQuests.progress[type]>=q.target){
+    state.npcQuests.completed.push(q.day);
+    state.coins+=q.reward;
+    state.stats.totalEarned+=q.reward;
+    toast(`День ${q.day}: +${q.reward.toLocaleString('ru-RU')}!`);
+    sfx('levelup');vibrate([30,60,30]);
+    if(q.day<7){state.npcQuests.day=q.day+1;state.npcQuests.progress={};}
+    save();
+  }
+}
+function generateQuests(){
+  const today=Math.floor(Date.now()/86400000);
+  if(state.quests.day===today&&state.quests.list.length)return;
+  const shuffled=[...QUEST_POOL].sort(()=>Math.random()-0.5);
+  state.quests.list=shuffled.slice(0,3).map(q=>({...q,progress:0,done:false,claimed:false}));
+  state.quests.day=today;
+}
+
+// ============= NPC-ТОРГОВЕЦ (фикс: не продаёт заблокированные семена) =============
+const NPC_SEEDS=['sakura','crystal','frost'];
+let npcNext=Date.now()+180000,npcActive=false;
+
+function spawnNpc(){
+  if(npcActive)return;
+  // ФИКС: не продаём то, что уже куплено или пока заблокировано уровнем
+  const available=NPC_SEEDS.filter(id=>{
+    if(state.ownedSeeds.includes(id))return false;
+    const p=PLANTS[id];
+    if(!p)return false;
+    if(p.unlock>1&&state.level<p.unlock)return false;
+    return true;
+  });
+  if(!available.length)return;
+  const seedId=available[Math.floor(Math.random()*available.length)];
+  const plant=PLANTS[seedId];
+  const price=Math.round(plant.price*(0.4+Math.random()*0.2));
+  npcActive=true;showNpcPopup(plant,price);
+  npcNext=Date.now()+300000+Math.random()*300000;
+}
+function showNpcPopup(plant,price){
+  const el=document.createElement('div');
+  el.className='npc-popup';
+  el.innerHTML=`<span class="npc-ico">🧙</span>ТОРГОВЕЦ<br>${plant.emoji} ${plant.name}<br><b>${price.toLocaleString('ru-RU')}</b>`;
+  el.onclick=()=>{el.remove();npcActive=false;openNpcModal(plant,price);};
+  document.body.appendChild(el);
+  setTimeout(()=>{if(el.parentNode){el.remove();npcActive=false;}},12000);
+}
+function openNpcModal(plant,price){
+  const offer=document.getElementById('npcOffer');
+  offer.innerHTML=`<div class="shop-item"><span class="emoji">${plant.emoji}</span><div class="info"><div class="name">${plant.name}</div><div class="price">${price.toLocaleString('ru-RU')}</div></div><button id="npcBuy">КУПИТЬ</button></div>`;
+  document.getElementById('npcBuy').onclick=()=>{
+    if(state.coins<price){toast('Мало монет');sfx('error');return;}
+    // ФИКС: повторная проверка на уровне
+    if(plant.unlock>1&&state.level<plant.unlock){toast('🔒 Уровень мал');sfx('error');closeModal('npcModal');return;}
+    state.coins-=price;
+    if(!state.ownedSeeds.includes(plant.id))state.ownedSeeds.push(plant.id);
+    state.equipped=plant.id;
+    toast('Куплено');sfx('buy');vibrate(15);
+    updateHUD();save();closeModal('npcModal');
+  };
+  document.getElementById('npcModal').classList.add('active');
+}
+
+// ============= CANVAS =============
+const canvas=document.getElementById('canvas');
+const mainCtx=canvas.getContext('2d');
+const offscreen=document.createElement('canvas');
+const ctx=offscreen.getContext('2d');
+let W=0,H=0,DPR=1,VW=0,VH=180;
+let plotLayout=[];
+const particles=[],floatTexts=[];
+let clouds=[],birds=[],leaves=[],fireflies=[];
+
+function resizeCanvas(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  const ga=document.getElementById('game-area');
+  W=ga.clientWidth||window.innerWidth||360;
+  H=ga.clientHeight||window.innerHeight||500;
+  if(H<100)H=500;
+  if(W<100)W=360;
+  canvas.width=W*DPR;canvas.height=H*DPR;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  mainCtx.setTransform(DPR,0,0,DPR,0,0);
+  mainCtx.imageSmoothingEnabled=false;
+  VH=180;VW=Math.round(VH*W/H);
+  offscreen.width=VW;offscreen.height=VH;
+  ctx.imageSmoothingEnabled=false;
+  layoutPlots();
+}
+window.addEventListener('resize',()=>setTimeout(resizeCanvas,100));
+window.addEventListener('orientationchange',()=>setTimeout(resizeCanvas,300));
+function layoutPlots(){
+  plotLayout=[];
+  const cols=3,rows=5,pad=2,topH=14,bottomH=6;
+  const availW=VW-pad*2,availH=VH-topH-bottomH;
+  const cellW=availW/cols,cellH=availH/rows;
+  const size=Math.min(cellW,cellH)-pad*2;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const cx=pad+cellW*(c+0.5),cy=topH+cellH*(r+0.5);
+    plotLayout.push({x:cx-size/2,y:cy-size/2,w:size,h:size,cx,cy});
+  }
+}
+function spawnWaterDrops(i){
+  const l=plotLayout[i];if(!l)return;
+  for(let k=0;k<4;k++)particles.push({x:l.cx+(Math.random()-0.5)*l.w*0.5,y:l.y+l.h*0.15,vx:(Math.random()-0.5)*0.4,vy:-0.6-Math.random()*0.4,life:1,size:1,color:'#A4E4FC'});
+}
+function spawnCoinBurst(i,amount){
+  const l=plotLayout[i];if(!l)return;
+  for(let k=0;k<8;k++)particles.push({x:l.cx+(Math.random()-0.5)*l.w*0.4,y:l.cy+(Math.random()-0.5)*l.h*0.4,vx:(Math.random()-0.5)*0.6,vy:-0.8-Math.random()*0.5,life:1,size:1,color:'#F8B800',gravity:0.04});
+  floatTexts.push({x:l.cx,y:l.y+l.h*0.4,text:`+${amount}`,color:'#F8B800',life:1,vy:-0.3});
+}
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;
+    if(p.gravity)p.vy+=p.gravity;
+    p.life-=0.02;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    ctx.globalAlpha=p.life;ctx.fillStyle=p.color;
+    ctx.fillRect(Math.round(p.x),Math.round(p.y),p.size,p.size);ctx.globalAlpha=1;
+  }
+  for(let i=floatTexts.length-1;i>=0;i--){
+    const t=floatTexts[i];t.y+=t.vy;t.life-=0.015;
+    if(t.life<=0){floatTexts.splice(i,1);continue;}
+    ctx.globalAlpha=t.life;ctx.font='bold 5px monospace';ctx.textAlign='center';
+    ctx.fillStyle='#000';ctx.fillText(t.text,Math.round(t.x)+1,Math.round(t.y)+1);
+    ctx.fillStyle=t.color;ctx.fillText(t.text,Math.round(t.x),Math.round(t.y));
+    ctx.globalAlpha=1;
+  }
+}
+function initAtmosphere(){
+  clouds=[];
+  for(let i=0;i<5;i++)clouds.push({x:Math.random()*VW,y:8+Math.random()*18,v:0.15+Math.random()*0.2});
+  birds=[];
+  for(let i=0;i<2;i++)birds.push({x:Math.random()*VW,y:15+Math.random()*20,vx:0.25+Math.random()*0.15,phase:Math.random()*Math.PI*2});
+  leaves=[];
+  for(let i=0;i<8;i++)leaves.push({x:Math.random()*VW,y:Math.random()*VH,vy:0.15+Math.random()*0.15,vx:(Math.random()-0.5)*0.1,phase:Math.random()*Math.PI*2});
+  fireflies=[];
+  for(let i=0;i<12;i++)fireflies.push({x:Math.random()*VW,y:40+Math.random()*(VH-60),phase:Math.random()*Math.PI*2,speed:0.5+Math.random()*0.5});
+}
+function drawBackground(){
+  const skin=SKINS[state.activeSkin]||SKINS.forest;
+  const isNightNow=isNight();
+  const bands=6;
+  for(let i=0;i<bands;i++){const t=i/bands;ctx.fillStyle=t<0.5?skin.sky1:skin.sky2;ctx.fillRect(0,Math.floor(VH*t*0.55),VW,Math.ceil(VH/bands)+1);}
+  const t=(Date.now()/1000/180)%1;
+  const angle=t*Math.PI*2-Math.PI/2;
+  const sunX=Math.round(VW/2+Math.cos(angle)*VW*1.1);
+  const sunY=Math.round(VH*0.35+Math.sin(angle)*VH*0.35);
+  const sunColor=isNightNow?'#FCFCFC':'#F8B800';
+  const sunDim=isNightNow?'#BCBCBC':'#AC7C00';
+  ctx.fillStyle=sunDim;ctx.fillRect(sunX-3,sunY-1,6,1);ctx.fillRect(sunX-1,sunY-3,1,6);
+  ctx.fillStyle=sunColor;ctx.fillRect(sunX-2,sunY-2,4,4);ctx.fillRect(sunX-1,sunY-3,2,1);ctx.fillRect(sunX-1,sunY+3,2,1);ctx.fillRect(sunX-4,sunY-1,1,2);ctx.fillRect(sunX+3,sunY-1,1,2);
+  ctx.fillStyle=isNightNow?'#5a5a7a':'#FCFCFC';
+  clouds.forEach(c=>{
+    c.x+=c.v;if(c.x>VW+40)c.x=-40;
+    const cx=Math.round(c.x),cy=Math.round(c.y);
+    ctx.fillRect(cx,cy,10,4);ctx.fillRect(cx+8,cy-3,14,7);ctx.fillRect(cx+20,cy-1,12,5);ctx.fillRect(cx+30,cy+1,8,3);
+    ctx.fillStyle=isNightNow?'#4a4a6a':'#D8D8D8';ctx.fillRect(cx,cy+4,38,1);
+    ctx.fillStyle=isNightNow?'#5a5a7a':'#FCFCFC';
+  });
+  const horizonY=Math.floor(VH*0.42);
+  const treeDark=isNightNow?'#000':'#005800';
+  const trunkDark=isNightNow?'#000':'#3C2000';
+  for(let k=0;k<VW+10;k+=12){
+    const seed=(k*7)%11;const ch=3+(seed%3);
+    ctx.fillStyle=treeDark;ctx.fillRect(k,horizonY-ch,6,ch);ctx.fillRect(k+2,horizonY-ch-2,4,2);
+    ctx.fillStyle=trunkDark;ctx.fillRect(k+2,horizonY,2,1);
+  }
+  const w=currentWeather();
+  if(w.id==='rain'||w.id==='storm'){
+    ctx.fillStyle='#A4E4FC';
+    for(let i=0;i<30;i++){const x=(i*17+Date.now()*0.06)%VW;const y=((i*23+Date.now()*0.18)%(VH*0.7));ctx.fillRect(Math.round(x),Math.round(y),1,3);}
+  }else if(w.id==='drought'){ctx.fillStyle='rgba(200,120,0,0.2)';ctx.fillRect(0,0,VW,VH);}
+  ctx.fillStyle=isNightNow?'#3C3C3C':'#000';
+  birds.forEach(b=>{
+    b.x+=b.vx;if(b.x>VW+20){b.x=-20;b.y=15+Math.random()*20;}
+    b.phase+=0.15;
+    const bx=Math.round(b.x),by=Math.round(b.y+Math.sin(b.phase)*2);
+    if(Math.sin(b.phase)>0){ctx.fillRect(bx-3,by-1,3,1);ctx.fillRect(bx+1,by-1,3,1);ctx.fillRect(bx,by,1,1);}
+    else{ctx.fillRect(bx-3,by+1,3,1);ctx.fillRect(bx+1,by+1,3,1);ctx.fillRect(bx,by,1,1);}
+  });
+  if(w.id==='rainbow'){
+    const colors=['#D82800','#FC7460','#F8B800','#58D854','#3CBCFC','#6844FC'];
+    colors.forEach((c,i)=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(VW/2,VH+10,50+i*2,Math.PI,Math.PI*2);ctx.lineWidth=1.5;ctx.strokeStyle=c;ctx.stroke();});
+  }
+  if(state.bossActive){
+    const pad=2,by=16,bh=6;
+    ctx.fillStyle='#000';ctx.fillRect(pad-1,by-1,VW-pad*2+2,bh+2);
+    ctx.fillStyle='#B80000';ctx.fillRect(pad,by,VW-pad*2,bh);
+    ctx.fillStyle='#FC7460';ctx.fillRect(pad,by,VW-pad*2,1);
+    ctx.fillStyle='#F8B800';ctx.fillRect(pad,by,Math.round((VW-pad*2)*state.bossProgress/100),bh);
+    ctx.font='bold 5px monospace';ctx.textAlign='center';
+    ctx.fillStyle='#000';ctx.fillText(`BOSS ${Math.floor(state.bossProgress)}%`,VW/2+1,by+5);
+    ctx.fillStyle='#FCFCFC';ctx.fillText(`BOSS ${Math.floor(state.bossProgress)}%`,VW/2,by+4);
+  }
+}
+function drawFence(){
+  const fy=VH-4;
+  ctx.fillStyle='#503000';ctx.fillRect(0,fy,VW,1);
+  ctx.fillStyle='#AC7C00';ctx.fillRect(0,fy+1,VW,3);
+  ctx.fillStyle='#7C7C7C';for(let i=0;i<VW;i+=8)ctx.fillRect(i,fy-1,1,3);
+  ctx.fillStyle='#000';ctx.fillRect(0,fy+4,VW,1);
+}
+function drawPlot(l,i){
+  const p=state.plots[i];if(!p)return;
+  const active=i<currentPlotsCount();
+  const x=Math.round(l.x),y=Math.round(l.y),w=Math.round(l.w),h=Math.round(l.h);
+  ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(x+1,y+h,w,1);
+  ctx.fillStyle='#3C2000';ctx.fillRect(x,y,w,h);
+  ctx.fillStyle='#7C4400';ctx.fillRect(x,y,w,2);
+  ctx.fillStyle='#1a0d00';for(let k=1;k<4;k++)ctx.fillRect(x+1,y+Math.round(h*k/4),w-2,1);
+  ctx.fillStyle='#7C7C7C';
+  const seed=i*13;
+  for(let k=0;k<3;k++){
+    const rx=x+2+((seed+k*7)%Math.max(1,w-4));
+    const ry=y+2+((seed+k*11)%Math.max(1,h-4));
+    ctx.fillRect(rx,ry,2,1);
+  }
+  ctx.fillStyle='#58D854';
+  for(let k=0;k<3;k++){const tx=x+1+((seed+k*5)%Math.max(1,w-2));ctx.fillRect(tx,y-1,1,1);}
+  ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+  if(!active){ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(x,y,w,h);}
+  if(p.seed&&active){
+    const cx=Math.round(l.cx),gy=Math.round(l.y+l.h*0.82);
+    const s=Math.max(3,Math.round(l.w*0.5));
+    drawPixelPlant(cx,gy,s,p.progress,p.seed,p.golden);
+  }
+  if(active&&p.seed&&p.progress<100){
+    const pw=Math.round(l.w*0.85),px=Math.round(l.cx-pw/2),py=Math.round(l.y+l.h-5);
+    ctx.fillStyle='#000';ctx.fillRect(px,py,pw,3);
+    ctx.fillStyle='#3CBCFC';ctx.fillRect(px+1,py+1,Math.max(0,Math.round((pw-2)*p.progress/100)),1);
+  }
+  if(!active){
+    const cx=Math.round(l.cx),cy=Math.round(l.cy);
+    ctx.fillStyle='#7C7C7C';ctx.fillRect(cx-3,cy-1,6,5);
+    ctx.fillStyle='#BCBCBC';ctx.fillRect(cx-3,cy-1,6,1);
+    ctx.fillStyle='#3C3C3C';ctx.fillRect(cx-2,cy-3,4,2);
+    ctx.fillStyle='#000';ctx.fillRect(cx-1,cy+1,2,2);
+  }
+}
+function drawPixelPlant(x,y,s,progress,seedId,golden){
+  const g=progress/100;
+  const stage=Math.min(4,Math.floor(g*5));
+  const pal=PLANT_PALETTES[seedId]||PLANT_PALETTES.carrot;
+  const maps=PLANT_MAPS[seedId]||PLANT_MAPS.carrot;
+  const map=maps[stage];
+  if(!map)return;
+  const sw=Math.max(3,Math.round(s*0.5));
+  ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(x-Math.floor(sw/2),y-1,sw,1);
+  const sway=Math.sin(Date.now()/900+x*0.3)*0.6;
+  const w=map[0].length,h=map.length;
+  const scale=stage===0?1:(stage<=2?1:2);
+  const px=x-Math.floor(w*scale/2),py=y-h*scale;
+  for(let ry=0;ry<h;ry++){
+    const rowOffset=Math.round(sway*(h-ry)/h);
+    for(let rx=0;rx<w;rx++){
+      const ch=map[ry][rx];
+      if(ch==='.')continue;
+      const color=pal[ch];
+      if(!color)continue;
+      ctx.fillStyle=color;
+      ctx.fillRect(px+rx*scale+rowOffset,py+ry*scale,scale,scale);
+    }
+  }
+  if(golden){
+    const t=Math.floor(Date.now()/250)%4;
+    ctx.fillStyle='#F8B800';ctx.fillRect(px+w*scale-1,py-3+t,1,1);ctx.fillRect(px-1,py+2,1,1);
+    ctx.fillStyle='#FCFCFC';ctx.fillRect(px+w*scale,py-2+t,1,1);
+  }
+}
+function updateAtmosphere(){
+  const season=currentSeason().id;
+  let leafColor='#58D854';
+  if(season==='autumn')leafColor='#F8B800';
+  else if(season==='winter')leafColor='#FCFCFC';
+  else if(season==='spring')leafColor='#FCBCB0';
+  leaves.forEach(lf=>{
+    lf.phase+=0.02;lf.y+=lf.vy;
+    lf.x+=lf.vx+Math.sin(lf.phase)*0.15;
+    if(lf.y>VH){lf.y=-3;lf.x=Math.random()*VW;}
+    if(lf.x<-3)lf.x=VW+3;if(lf.x>VW+3)lf.x=-3;
+    ctx.fillStyle=leafColor;
+    ctx.fillRect(Math.round(lf.x),Math.round(lf.y),1,1);
+    ctx.fillRect(Math.round(lf.x)+1,Math.round(lf.y)+1,1,1);
+  });
+  if(isNight()){
+    fireflies.forEach(ff=>{
+      ff.phase+=0.05;
+      ctx.globalAlpha=0.5+Math.sin(ff.phase)*0.5;
+      ctx.fillStyle='#F8B800';
+      ctx.fillRect(Math.round(ff.x+Math.sin(ff.phase*0.3)*3),Math.round(ff.y),1,1);
+      ctx.globalAlpha=1;
+    });
+  }
+}
+let renderRunning=false;
+function render(){
+  if(renderRunning)return;
+  renderRunning=true;
+  function loop(){
+    if(!renderRunning)return;
+    try{
+      ctx.clearRect(0,0,VW,VH);
+      drawBackground();drawFence();
+      for(let i=0;i<plotLayout.length;i++)drawPlot(plotLayout[i],i);
+      updateParticles();updateAtmosphere();
+      mainCtx.clearRect(0,0,W,H);
+      mainCtx.imageSmoothingEnabled=false;
+      mainCtx.drawImage(offscreen,0,0,VW,VH,0,0,W,H);
+    }catch(e){console.warn('render error:',e);}
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+function stopRender(){renderRunning=false;}
+
+const PLANT_PALETTES={
+  carrot:{g:'#00A800',G:'#58D854',o:'#FC7460',O:'#F8B800',d:'#005800'},
+  tomato:{g:'#00A800',G:'#58D854',r:'#D82800',R:'#FC7460',d:'#005800'},
+  corn:{g:'#58D854',G:'#B8F8B8',y:'#F8B800',Y:'#FCFCFC',d:'#005800'},
+  pumpkin:{g:'#00A800',G:'#58D854',o:'#FC7460',O:'#F8B800',d:'#005800'},
+  sunflower:{g:'#00A800',G:'#58D854',y:'#F8B800',b:'#503000',d:'#005800'},
+  rose:{g:'#005800',G:'#00A800',p:'#D82800',P:'#FC7460',d:'#3C3C3C'},
+  sakura:{g:'#503000',G:'#6844FC',p:'#FCBCB0',P:'#FCFCFC',d:'#3C3C3C'},
+  crystal:{c:'#3CBCFC',C:'#A4E4FC',w:'#FCFCFC',d:'#0078F8'},
+  frost:{b:'#3CBCFC',B:'#A4E4FC',w:'#FCFCFC',d:'#0078F8'},
+  golden:{y:'#F8B800',Y:'#FCFCFC',o:'#FC7460',w:'#FCFCFC'},
+  carrot_tomato:{g:'#00A800',G:'#58D854',o:'#FC7460',r:'#D82800',d:'#005800'},
+  corn_pumpkin:{g:'#58D854',G:'#B8F8B8',y:'#F8B800',o:'#FC7460',d:'#005800'},
+  sunflower_rose:{g:'#00A800',G:'#58D854',y:'#F8B800',p:'#D82800',d:'#005800'},
+  sakura_rose:{g:'#503000',G:'#6844FC',p:'#FCBCB0',r:'#D82800',d:'#3C3C3C'},
+  crystal_frost:{c:'#3CBCFC',C:'#A4E4FC',w:'#FCFCFC',d:'#0078F8'},
+};
+const PLANT_MAPS={
+  carrot:[['g'],['g','g','.'],['.g.','gGg','.g.','.g.'],['.g.g.','gGgGg','.gGg.','..g..'],['.g.g.','gGgGg','.gGg.','..g..','..o..','.oOo.']],
+  tomato:[['g'],['g','g'],['.g.','gGg','.g.'],['.g.','gGg','gGg','.g.'],['.g.','gGg','gRr','.g.','.r.']],
+  corn:[['g'],['g','g'],['.g.','.g.','gGg'],['.g.','.g.','gGg','.g.'],['.g.','.g.','gyg','gYg','.g.']],
+  pumpkin:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.g.'],['.g.','gGg','.ooo.','oOOOo','.ooo.']],
+  sunflower:[['g'],['g','g'],['.g.','gGg','.g.'],['.g.','gGg','.g.','.g.'],['.g.','gyg','yYy','gyg','.g.']],
+  rose:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.g.'],['.g.','pPp','pPp','.g.','.g.']],
+  sakura:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.g.'],['.g.','pPp','pPPp','.p.']],
+  crystal:[['c'],['c','c'],['.c.','cCc'],['.c.','cCc','.c.'],['.c.','cCc','cCw','.c.']],
+  frost:[['b'],['b','b'],['.b.','bBb'],['.b.','bBb','.b.'],['.b.','bBb','bBw','.b.']],
+  golden:[['y'],['y','y'],['.y.','yYy'],['.y.','yYy','.y.'],['.y.','yYy','yYw','.y.']],
+  carrot_tomato:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.g.'],['.g.','oOo','oRw','.g.']],
+  corn_pumpkin:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.y.'],['.g.','yoy','oPo','.y.']],
+  sunflower_rose:[['g'],['g','g'],['.g.','gGg'],['.g.','ygy','.g.'],['.g.','yPy','ypp','.y.']],
+  sakura_rose:[['g'],['g','g'],['.g.','gGg'],['.g.','gGg','.p.'],['.g.','pPp','pRw','.p.']],
+  crystal_frost:[['c'],['c','c'],['.c.','cCc'],['.c.','cCc','.c.'],['.c.','cCc','cBw','.c.']],
+};
+
+// ============= РЫБАЛКА =============
+const fishCanvas=document.getElementById('fishingCanvas');
+const fctx=fishCanvas.getContext('2d');
+let FVW=0,FVH=0;
+let fishState='idle';
+function resizeFishingCanvas(){
+  const rect=fishCanvas.getBoundingClientRect();
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  fishCanvas.width=rect.width*dpr;fishCanvas.height=rect.height*dpr;
+  fctx.setTransform(dpr,0,0,dpr,0,0);fctx.imageSmoothingEnabled=false;
+  FVW=rect.width;FVH=rect.height;
+}
+window.addEventListener('resize',()=>{if(document.getElementById('fishingModal').classList.contains('active'))resizeFishingCanvas();});
+function drawFishing(){
+  if(!FVW||!FVH)return;
+  fctx.clearRect(0,0,FVW,FVH);
+  const zone=state.fishing.zone||1;
+  const skyGrad=fctx.createLinearGradient(0,0,0,FVH*0.3);
+  if(zone===1){skyGrad.addColorStop(0,'#A4E4FC');skyGrad.addColorStop(1,'#3CBCFC');}
+  else{skyGrad.addColorStop(0,'#6844FC');skyGrad.addColorStop(1,'#F8B800');}
+  fctx.fillStyle=skyGrad;fctx.fillRect(0,0,FVW,FVH*0.3);
+  const isNightNow=isNight();
+  fctx.fillStyle=isNightNow?'#FCFCFC':'#F8B800';fctx.fillRect(FVW*0.8,FVH*0.1,8,8);
+  const waterGrad=fctx.createLinearGradient(0,FVH*0.3,0,FVH);
+  if(zone===1){waterGrad.addColorStop(0,'#0078F8');waterGrad.addColorStop(1,'#0000FC');}
+  else{waterGrad.addColorStop(0,'#F8B800');waterGrad.addColorStop(1,'#AC7C00');}
+  fctx.fillStyle=waterGrad;fctx.fillRect(0,FVH*0.3,FVW,FVH*0.7);
+  const t=Date.now()/500;
+  fctx.fillStyle='rgba(255,255,255,0.3)';
+  for(let i=0;i<20;i++){const wx=(i*37+t*20)%FVW;const wy=FVH*0.32+Math.sin(t+i)*3;fctx.fillRect(wx,wy,3,1);}
+  const fishEmojis=zone===1?['🐟','🐠','🐡','🍣','🦈']:['💎','🌈','👑','🌌'];
+  fishEmojis.forEach((em,idx)=>{
+    const fy=FVH*0.5+idx*12+Math.sin(t*0.5+idx)*4;
+    const fx=(FVW*0.1+idx*FVW*0.2+t*8*(idx%2?1:-1))%FVW;
+    fctx.globalAlpha=0.6;fctx.font='16px sans-serif';fctx.fillText(em,fx,FVH*0.9-20);fctx.globalAlpha=1;
+  });
+  if(fishState==='cast'){
+    const bob=Math.sin(t*3)*2;
+    fctx.fillStyle='#D82800';fctx.fillRect(FVW/2-2,FVH*0.3+bob-4,4,4);
+    fctx.fillStyle='#FCFCFC';fctx.fillRect(FVW/2-2,FVH*0.3+bob,4,3);
+    fctx.strokeStyle='#3C3C3C';fctx.lineWidth=1;
+    fctx.beginPath();fctx.moveTo(FVW/2,FVH*0.3+bob);fctx.lineTo(FVW/2+20,0);fctx.stroke();
+  }
+  if(fishState==='bite'){
+    const bob=Math.sin(t*10)*4;
+    fctx.fillStyle='#F8B800';fctx.fillRect(FVW/2-3,FVH*0.3+bob-5,6,6);
+    fctx.fillStyle='#FCFCFC';fctx.fillRect(FVW/2-3,FVH*0.3+bob+1,6,4);
+    fctx.strokeStyle='rgba(255,255,255,0.8)';fctx.lineWidth=1;
+    for(let i=1;i<3;i++){fctx.beginPath();fctx.arc(FVW/2,FVH*0.35+bob,i*8,0,Math.PI*2);fctx.stroke();}
+  }
+  requestAnimationFrame(drawFishing);
+}
+function updateFishingUI(){
+  document.getElementById('rodName').textContent=currentRod().name;
+  document.getElementById('fishCaught').textContent=state.fishing.totalCaught;
+  document.getElementById('fishRecord').textContent=state.fishing.bestPrice.toLocaleString('ru-RU');
+  const z1=document.getElementById('zoneBtn1');const z2=document.getElementById('zoneBtn2');
+  z1.classList.toggle('active',state.fishing.zone===1);
+  z2.classList.toggle('active',state.fishing.zone===2);
+  z2.disabled=!goldPondUnlocked();
+  z2.textContent=goldPondUnlocked()?'ЗОЛОТОЙ':'🔒';
+  const list=document.getElementById('rodList');list.innerHTML='';
+  const curRod=currentRod();
+  const curDiv=document.createElement('div');curDiv.className='shop-item';
+  curDiv.innerHTML=`<span class="emoji">${curRod.icon}</span><div class="info"><div class="name">${curRod.name} ур.${curRod.level}</div><div class="price">+${Math.round(curRod.bonus*100)}%</div></div></div>`;
+  list.appendChild(curDiv);
+  const nextRod=RODS[state.fishing.rodLevel+1];
+  if(nextRod){
+    const locked=nextRod.unlock>state.level;
+    const needsPrestige=nextRod.prestige&&!goldPondUnlocked();
+    const canBuy=!locked&&!needsPrestige&&state.coins>=nextRod.cost;
+    const div=document.createElement('div');div.className='shop-item';
+    let lockText='';
+    if(locked)lockText=`🔒 УР.${nextRod.unlock}`;
+    else if(needsPrestige)lockText='🔒 ПРЕСТИЖ';
+    div.innerHTML=`<span class="emoji">${nextRod.icon}</span><div class="info"><div class="name">${nextRod.name} ур.${nextRod.level}</div><div class="price">${lockText||nextRod.cost.toLocaleString('ru-RU')+'💰'}</div><div class="sub">+${Math.round(nextRod.bonus*100)}%</div></div><button ${canBuy?'':'disabled'}>${locked||needsPrestige?'🔒':'КУПИТЬ'}</button>`;
+    if(canBuy)div.querySelector('button').onclick=()=>{
+      state.coins-=nextRod.cost;state.fishing.rodLevel++;
+      toast(`${nextRod.name}!`);sfx('levelup');vibrate([30,60,30]);
+      updateHUD();save();updateFishingUI();
+    };
+    list.appendChild(div);
+  }else{
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">👑</span><div class="info"><div class="name">МАКС!</div></div></div>`;
+    list.appendChild(div);
+  }
+}
+function currentRod(){return RODS[state.fishing.rodLevel];}
+function pickFish(){
+  const zone=state.fishing.zone||1;
+  const pool=zone===1?FISH:GOLD_FISH;
+  const rod=currentRod();
+  const weather=currentWeather();
+  const weatherBonus=weather.fishBonus||1;
+  const nightBonus=isNight()?1.5:1;
+  let weighted=pool.map(f=>{
+    let w=f.weight;
+    if(f.rarity==='rare')w*=(1+rod.bonus*0.5)*weatherBonus;
+    else if(f.rarity==='epic')w*=(1+rod.bonus)*weatherBonus*nightBonus;
+    else if(f.rarity==='legendary'||f.rarity==='mythic')w*=(1+rod.bonus*1.5)*weatherBonus*nightBonus*(1+rod.luck*0.5);
+    return {...f,w};
+  });
+  const total=weighted.reduce((s,f)=>s+f.w,0);
+  let r=Math.random()*total;
+  for(const f of weighted){r-=f.w;if(r<=0)return f;}
+  return pool[0];
+}
+function castRod(){
+  if(fishState!=='idle')return;
+  if(Date.now()<state.fishing.cooldownUntil){
+    const left=Math.ceil((state.fishing.cooldownUntil-Date.now())/1000);
+    setFishStatus(`ОТДЫХ ${left}С`,'');
+    return;
+  }
+  fishState='cast';setFishStatus('ЗАБРОШЕНО...','cast');sfx('plant');
+  const delay=1500+Math.random()*2500;
+  setTimeout(()=>{
+    if(fishState!=='cast')return;
+    fishState='bite';setFishStatus('КЛЮЁТ! ТАПАЙ!','bite');
+    sfx('ready');vibrate([50,100,50]);
+    setTimeout(()=>{
+      if(fishState==='bite'){
+        fishState='idle';setFishStatus('СОРВАЛАСЬ...','');
+        state.fishing.cooldownUntil=Date.now()+1500;
+        setTimeout(()=>setFishStatus('ТАПНИ ПО ПРУДУ',''),1500);
+      }
+    },1600);
+  },delay);
+}
+function catchFish(){
+  if(fishState!=='bite')return;
+  const fish=pickFish();
+  const price=Math.round(fish.price*prestigeCoinBonus()*nightCoinMult()*aquaBonus());
+  state.coins+=price;
+  state.stats.totalEarned+=price;
+  state.stats.weeklyEarned+=price;
+  state.fishing.totalCaught++;
+  if(price>state.fishing.bestPrice){state.fishing.bestPrice=price;state.fishing.bestFish=fish.id;}
+  state.records.bestFishPrice=Math.max(state.records.bestFishPrice,price);
+  const isNew=!state.aquarium[fish.id];
+  if(isNew){
+    const usedSlots=Object.values(state.aquarium);
+    let free=-1;
+    for(let i=0;i<AQUA_SIZE;i++){if(!usedSlots.includes(i)){free=i;break;}}
+    if(free>=0){state.aquarium[fish.id]=free;setTimeout(()=>toast(`${fish.icon} в аквариум!`),800);}
+  }
+  toast(`${fish.icon} +${price.toLocaleString('ru-RU')}`);
+  sfx('harvest');vibrate([20,40,20]);
+  setFishStatus(`${fish.icon} +${price.toLocaleString('ru-RU')}`,'caught');
+  fishState='idle';state.fishing.cooldownUntil=Date.now()+1500;
+  updateQuestProgress('fish',1);updateNpcProgress('fish',1);
+  checkAchievements();
+  updateHUD();updateFishingUI();submitScore();save();
+  setTimeout(()=>setFishStatus('ТАПНИ ПО ПРУДУ',''),1800);
+}
+function setFishStatus(text,cls){const el=document.getElementById('fishingStatus');el.textContent=text;el.className='fishing-status'+(cls?' '+cls:'');}
+function openFishing(){
+  if(!canFish()){
+    toast(`🔒 Пруд на ${POND_LEVEL} уровне`);
+    sfx('error');
+    const left=POND_LEVEL-state.level;
+    showEventBanner(`ПРУД ОТКРОЕТСЯ ЧЕРЕЗ ${left} УР.`);
+    return;
+  }
+  document.getElementById('fishingModal').classList.add('active');
+  setTimeout(()=>{resizeFishingCanvas();drawFishing();},100);
+  updateFishingUI();
+  fishCanvas.onclick=()=>{if(fishState==='bite')catchFish();else if(fishState==='idle')castRod();};
+  fishCanvas.ontouchstart=(e)=>{e.preventDefault();if(fishState==='bite')catchFish();else if(fishState==='idle')castRod();};
+}
+document.getElementById('zoneBtn1').onclick=()=>{if(fishState!=='idle')return;state.fishing.zone=1;updateFishingUI();save();};
+document.getElementById('zoneBtn2').onclick=()=>{if(fishState!=='idle')return;if(!goldPondUnlocked()){toast('🔒 Престиж');sfx('error');return;}state.fishing.zone=2;updateFishingUI();save();};
+
+// ============= АКВАРИУМ =============
+let aquaFish={},aquaBubbles=[],aquaAnimId=null;
+function resizeAquaCanvas(){
+  const c=document.getElementById('aquaCanvas');
+  if(!c)return;
+  const rect=c.getBoundingClientRect();
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  c.width=rect.width*dpr;c.height=rect.height*dpr;
+  const ctx2=c.getContext('2d');
+  ctx2.setTransform(dpr,0,0,dpr,0,0);ctx2.imageSmoothingEnabled=false;
+}
+function initAquaFish(){
+  const allFish=[...FISH,...GOLD_FISH];
+  aquaFish={};
+  const c=document.getElementById('aquaCanvas');
+  const W2=c.getBoundingClientRect().width;
+  const H2=c.getBoundingClientRect().height;
+  Object.keys(state.aquarium).forEach(id=>{
+    const fish=allFish.find(x=>x.id===id);
+    if(!fish)return;
+    const rarity=fish.rarity;
+    const size=rarity==='mythic'?30:rarity==='legendary'?26:rarity==='epic'?22:rarity==='rare'?20:18;
+    aquaFish[id]={x:60+Math.random()*(W2-120),y:60+Math.random()*(H2-140),vx:(Math.random()<0.5?-1:1)*(0.3+Math.random()*0.5),vy:(Math.random()-0.5)*0.2,size:size,phase:Math.random()*Math.PI*2,fish:fish};
+  });
+  aquaBubbles=[];
+  for(let i=0;i<10;i++){
+    aquaBubbles.push({x:Math.random()*W2,y:H2+Math.random()*100,size:1+Math.random()*2.5,speed:0.3+Math.random()*0.5,phase:Math.random()*Math.PI*2});
+  }
+}
+function drawAqua(){
+  const c=document.getElementById('aquaCanvas');
+  if(!c)return;
+  const rect=c.getBoundingClientRect();
+  const W2=rect.width,H2=rect.height;
+  if(W2<10||H2<10)return;
+  const ctx2=c.getContext('2d');
+  const bands=8;
+  for(let i=0;i<bands;i++){const t=i/bands;ctx2.fillStyle=t<0.5?'#0078F8':'#0000FC';ctx2.fillRect(0,Math.floor(H2*t),W2,Math.ceil(H2/bands)+1);}
+  const lightGrad=ctx2.createLinearGradient(0,0,0,H2*0.5);
+  lightGrad.addColorStop(0,'rgba(164,228,252,0.35)');
+  lightGrad.addColorStop(1,'rgba(164,228,252,0)');
+  ctx2.fillStyle=lightGrad;ctx2.fillRect(0,0,W2,H2*0.5);
+  ctx2.fillStyle='#503000';ctx2.fillRect(0,H2-10,W2,10);
+  ctx2.fillStyle='#7C4400';
+  for(let i=0;i<W2;i+=6){const off=(i*7)%10;ctx2.fillRect(i,H2-10+off%5,3,2);}
+  ctx2.fillStyle='#3C2000';ctx2.fillRect(0,H2-1,W2,1);
+  const t2=Date.now()/1000;
+  for(let i=0;i<10;i++){
+    const baseX=15+i*((W2-30)/10);
+    const height=25+((i*13)%20);
+    const sway=Math.sin(t2*0.8+i)*3;
+    ctx2.fillStyle='#005800';
+    for(let seg=0;seg<5;seg++){const segY=H2-10-(height/5)*seg;const segSway=Math.sin(t2*0.8+i+seg*0.5)*3;ctx2.fillRect(baseX+sway*0.3+segSway-1,segY,2,height/5+1);}
+    ctx2.fillStyle='#00A800';
+    for(let seg=0;seg<5;seg++){const segY=H2-10-(height/5)*seg;const segSway=Math.sin(t2*0.8+i+seg*0.5)*3;ctx2.fillRect(baseX+sway*0.3+segSway,segY,1,height/5+1);}
+  }
+  aquaBubbles.forEach(b=>{
+    b.y-=b.speed;b.phase+=0.05;b.x+=Math.sin(b.phase)*0.4;
+    if(b.y<-5){b.y=H2+5;b.x=Math.random()*W2;}
+    ctx2.fillStyle='rgba(164,228,252,0.5)';
+    ctx2.beginPath();ctx2.arc(Math.round(b.x),Math.round(b.y),b.size,0,Math.PI*2);ctx2.fill();
+    ctx2.fillStyle='rgba(255,255,255,0.9)';ctx2.fillRect(Math.round(b.x)-1,Math.round(b.y)-1,1,1);
+  });
+  Object.keys(aquaFish).forEach(id=>{
+    const f=aquaFish[id];
+    f.x+=f.vx;f.y+=f.vy;f.phase+=0.05;
+    if(f.x<25){f.x=25;f.vx=Math.abs(f.vx);}
+    if(f.x>W2-25){f.x=W2-25;f.vx=-Math.abs(f.vx);}
+    if(f.y<25){f.y=25;f.vy=Math.abs(f.vy);}
+    if(f.y>H2-25){f.y=H2-25;f.vy=-Math.abs(f.vy);}
+    if(Math.random()<0.008)f.vy=(Math.random()-0.5)*0.4;
+    f.vy=Math.max(-0.5,Math.min(0.5,f.vy));
+    const bob=Math.sin(f.phase)*1.5;
+    const fx=Math.round(f.x),fy=Math.round(f.y+bob);
+    ctx2.fillStyle='rgba(0,0,0,0.15)';
+    ctx2.fillRect(fx-f.size/2+2,fy+f.size/2-2,f.size-2,2);
+    ctx2.save();ctx2.translate(fx,fy);
+    if(f.vx<0)ctx2.scale(-1,1);
+    ctx2.font=`${f.size}px sans-serif`;ctx2.textAlign='center';ctx2.textBaseline='middle';
+    ctx2.fillText(f.fish.icon,0,0);
+    ctx2.restore();
+    if(f.fish.rarity==='legendary'||f.fish.rarity==='mythic'){
+      const glow=0.5+Math.sin(Date.now()/300+f.phase)*0.5;
+      ctx2.fillStyle=`rgba(248,184,0,${glow*0.4})`;
+      ctx2.beginPath();ctx2.arc(Math.round(f.x),Math.round(f.y),f.size*0.7,0,Math.PI*2);ctx2.fill();
+    }
+  });
+}
+function startAquaAnim(){
+  if(aquaAnimId)cancelAnimationFrame(aquaAnimId);
+  function loop(){
+    if(!document.getElementById('aquaModal').classList.contains('active')){aquaAnimId=null;return;}
+    drawAqua();
+    aquaAnimId=requestAnimationFrame(loop);
+  }
+  aquaAnimId=requestAnimationFrame(loop);
+}
+function openAquarium(){
+  const allFish=[...FISH,...GOLD_FISH];
+  const uniqueCount=Object.keys(state.aquarium).length;
+  const emptyEl=document.getElementById('aquaEmpty');
+  const canvasEl=document.getElementById('aquaCanvas');
+  if(uniqueCount===0){
+    emptyEl.style.display='block';canvasEl.style.display='none';
+    document.getElementById('aquaInfo').innerHTML='';
+  } else {
+    emptyEl.style.display='none';canvasEl.style.display='block';
+    document.getElementById('aquaInfo').innerHTML=`СОБРАНО: <b style="color:#F8B800">${uniqueCount}</b> / ${allFish.length}<br>БОНУС: <b style="color:#58D854">+${uniqueCount}%</b>`;
+  }
+  document.getElementById('aquaModal').classList.add('active');
+  setTimeout(()=>{resizeAquaCanvas();initAquaFish();startAquaAnim();},100);
+}
+window.addEventListener('resize',()=>{
+  if(document.getElementById('aquaModal').classList.contains('active')){resizeAquaCanvas();initAquaFish();}
+});
+
+// ============= ЗВУК / МУЗЫКА =============
+let musicPlaying=false,musicTimers=[];
+const MELODY=[
+  {f:523,d:200},{f:659,d:200},{f:784,d:200},{f:659,d:200},
+  {f:523,d:200},{f:587,d:200},{f:659,d:400},
+  {f:587,d:200},{f:523,d:200},{f:493,d:200},{f:440,d:400},
+  {f:523,d:200},{f:659,d:200},{f:784,d:200},{f:880,d:200},
+  {f:784,d:200},{f:659,d:200},{f:523,d:400},
+  {f:493,d:200},{f:523,d:200},{f:587,d:200},{f:659,d:200},{f:523,d:600},
+];
+let melodyIdx=0;
+function playNote(freq,dur,vol,wave){
+  if(!audioCtx)return;
+  const now=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=wave||'square';o.frequency.setValueAtTime(freq,now);
+  g.gain.setValueAtTime(vol,now);g.gain.exponentialRampToValueAtTime(0.001,now+dur/1000);
+  o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+dur/1000);
+}
+function musicLoop(){
+  if(!musicPlaying||!audioCtx)return;
+  const note=MELODY[melodyIdx];
+  playNote(note.f,note.d,0.025,'square');
+  if(melodyIdx%2===0)playNote(note.f/4,note.d*1.5,0.035,'triangle');
+  if(melodyIdx%4===0){
+    const now=audioCtx.currentTime;
+    const buf=audioCtx.createBuffer(1,800,audioCtx.sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<800;i++)data[i]=(Math.random()*2-1)*(1-i/800);
+    const src=audioCtx.createBufferSource();src.buffer=buf;
+    const g=audioCtx.createGain();g.gain.setValueAtTime(0.012,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.05);
+    src.connect(g);g.connect(audioCtx.destination);src.start(now);
+  }
+  melodyIdx=(melodyIdx+1)%MELODY.length;
+  musicTimers.push(setTimeout(musicLoop,note.d));
+}
+function startMusic(){
+  if(musicPlaying)return;
+  if(!audioCtx)initAudio();
+  if(!audioCtx)return;
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  musicPlaying=true;musicLoop();
+}
+function stopMusic(){musicPlaying=false;musicTimers.forEach(t=>clearTimeout(t));musicTimers=[];}
+
+function toast(text){
+  const el=document.createElement('div');el.className='toast';el.textContent=text;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{el.style.transition='opacity .3s';el.style.opacity='0';setTimeout(()=>el.remove(),300);},1200);
+}
+function vibrate(p){if(navigator.vibrate)try{navigator.vibrate(p);}catch(e){}}
+let audioCtx=null;
+function initAudio(){if(!audioCtx)try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+function sfx(type){
+  if(!audioCtx)return;
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  const now=audioCtx.currentTime;
+  const play=(freq,dur,wave='sine',vol=0.08,slideTo)=>{
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=wave;o.frequency.setValueAtTime(freq,now);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,now+dur);
+    g.gain.setValueAtTime(vol,now);g.gain.exponentialRampToValueAtTime(0.001,now+dur);
+    o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+dur);
+  };
+  switch(type){
+    case 'plant':play(220,0.08,'square',0.06,330);break;
+    case 'water':play(800,0.1,'square',0.05,400);break;
+    case 'ready':play(880,0.15,'square',0.07,1320);break;
+    case 'harvest':play(660,0.12,'square',0.05,990);setTimeout(()=>play(990,0.1,'square',0.05,1320),70);break;
+    case 'buy':play(440,0.1,'square',0.06,660);break;
+    case 'levelup':play(523,0.1,'square',0.08);setTimeout(()=>play(659,0.1,'square',0.08),90);setTimeout(()=>play(784,0.15,'square',0.08),180);break;
+    case 'error':play(180,0.15,'square',0.05);break;
+    case 'reward':play(784,0.1,'square',0.07);setTimeout(()=>play(1046,0.15,'square',0.07),100);break;
+  }
+}
+function handlePointer(cx,cy){
+  if(!musicPlaying)startMusic();
+  const ga=document.getElementById('game-area');
+  const rect=ga.getBoundingClientRect();
+  const vx=(cx-rect.left)/rect.width*VW;
+  const vy=(cy-rect.top)/rect.height*VH;
+  if(state.bossActive&&vy>=15&&vy<=23){waterBoss();sfx('water');vibrate(5);return;}
+  for(let i=0;i<plotLayout.length;i++){
+    const l=plotLayout[i];
+    if(vx>=l.x&&vx<=l.x+l.w&&vy>=l.y&&vy<=l.y+l.h){
+      if(i>=currentPlotsCount()){toast('Закрыто');sfx('error');return;}
+      tapPlot(i);return;
+    }
+  }
+}
+canvas.addEventListener('touchstart',e=>{e.preventDefault();initAudio();const t=e.changedTouches[0];handlePointer(t.clientX,t.clientY);},{passive:false});
+canvas.addEventListener('mousedown',e=>{initAudio();handlePointer(e.clientX,e.clientY);});
+
+// ============= HUD =============
+function updateHUD(){
+  document.getElementById('coins').textContent='💰 '+state.coins.toLocaleString('ru-RU');
+  document.getElementById('level').textContent='⭐ '+state.level+(state.prestige>0?` ♻${state.prestige}`:'');
+  const w=currentWeather();
+  document.getElementById('weather').textContent=isNight()?'НОЧЬ':`${w.icon} ${w.name.toUpperCase()}`;
+  const s=currentSeason();
+  document.getElementById('season').textContent=`${s.icon} ${s.name.toUpperCase()}`;
+  const need=xpForLevel(state.level);
+  document.getElementById('xpFill').style.width=Math.min(100,(state.xp/need)*100)+'%';
+  setBadge('dailyBadge',canClaimDaily()?1:0);
+  setBadge('questBadge',unclaimedQuests());
+  setBadge('achBadge',unclaimedAchievements());
+  setBadge('craftBadge',unclaimedCraft());
+  setBadge('pStarsBadge',state.prestigeStars>0?state.prestigeStars:0);
+  const fishBtn=document.getElementById('fishBtn');
+  const fishLbl=fishBtn.querySelector('.lbl');
+  if(canFish()){
+    fishBtn.classList.remove('locked');
+    fishLbl.textContent='ПРУД';
+    document.getElementById('fishBadge').classList.remove('show');
+  } else {
+    fishBtn.classList.add('locked');
+    fishLbl.textContent='УР.'+POND_LEVEL;
+    setBadge('fishBadge',POND_LEVEL);
+  }
+}
+function setBadge(id,count){
+  const el=document.getElementById(id);if(!el)return;
+  if(count>0){el.textContent=count>99?'99+':count;el.classList.add('show');}
+  else el.classList.remove('show');
+}
+
+// ============= ОФФЛАЙН-СИНХРОНИЗАЦИЯ =============
+function flushOfflineQueue(){
+  if(!fbReady||!fbDB||!navigator.onLine)return;
+  const p=state.offline.pendingScore;
+  if(!p)return;
+  try{
+    fbDB.ref('scores/'+p.key).set(p.payload);
+    fbDB.ref('seasonal/'+p.key).set(p.seasonPayload);
+    fbDB.ref('seasonal_archive/w'+p.week+'/'+p.key).set(p.seasonPayload);
+    state.offline.pendingScore=null;
+    save();
+    toast('☁️ Результат отправлен');
+  }catch(e){console.warn('Sync failed',e);}
+}
+function updateOfflineBadge(){
+  const el=document.getElementById('offlineBadge');
+  if(!el)return;
+  el.style.display=(!navigator.onLine||state.offline.isOffline)?'inline-block':'none';
+}
+window.addEventListener('online',()=>{state.offline.isOffline=false;updateOfflineBadge();flushOfflineQueue();toast('🌐 Интернет восстановлен');});
+window.addEventListener('offline',()=>{state.offline.isOffline=true;updateOfflineBadge();toast('📴 Оффлайн-режим');});
+setInterval(()=>{if(navigator.onLine&&state.offline.pendingScore)flushOfflineQueue();},30000);
+
+// ============= ОТПРАВКА РЕЗУЛЬТАТА =============
+function submitScore(force){
+  if(!state.playerName)return;
+  if(yIsYandex)submitToYandexLeaderboard(Math.max(state.stats.totalEarned,state.coins));
+  const week=seasonWeek();
+  const key=state.playerName.toLowerCase().replace(/\s+/g,'_');
+  const payload={name:state.playerName,avatar:state.avatar||'🌱',coins:state.coins,level:state.level,prestige:state.prestige||0,harvest:state.stats.totalHarvest,time:Date.now()};
+  const seasonPayload={name:state.playerName,avatar:state.avatar||'🌱',weekly:state.stats.weeklyEarned,level:state.level,week:week,time:Date.now()};
+  if(!fbReady||!fbDB||!navigator.onLine||state.offline.isOffline){
+    state.offline.pendingScore={payload,seasonPayload,week,key};save();return;
+  }
+  try{
+    fbDB.ref('scores/'+key).set(payload);
+    fbDB.ref('seasonal/'+key).set(seasonPayload);
+    fbDB.ref('seasonal_archive/w'+week+'/'+key).set(seasonPayload);
+    state.offline.pendingScore=null;
+    save();
+  }catch(e){state.offline.pendingScore={payload,seasonPayload,week,key};save();}
+}
+
+// ============= НАГРАДЫ ТОП-3 =============
+function checkWeeklyRewards(){
+  if(!navigator.onLine||!fbReady||!fbDB||!state.playerName)return;
+  const currentWeek=seasonWeek();
+  const prevWeek=currentWeek-1;
+  if(prevWeek<1)return;
+  const lastChecked=state.rewards.lastCheckedWeek||0;
+  if(lastChecked>=prevWeek)return;
+  if(lastChecked===0){state.rewards.lastCheckedWeek=prevWeek;save();return;}
+  const key=state.playerName.toLowerCase().replace(/\s+/g,'_');
+  fbDB.ref('seasonal_archive/w'+prevWeek).once('value').then(snap=>{
+    const arr=[];
+    snap.forEach(ch=>{const v=ch.val();if(v&&typeof v==='object')arr.push({...v,_key:ch.key});});
+    arr.sort((a,b)=>(b.weekly||0)-(a.weekly||0));
+    const myIdx=arr.findIndex(r=>r._key===key);
+    state.rewards.lastCheckedWeek=prevWeek;
+    if(myIdx>=0&&myIdx<3){
+      const p=WEEK_PRIZES[myIdx];
+      state.prestigeStars=(state.prestigeStars||0)+p.stars;
+      state.coins+=p.coins;
+      state.stats.totalEarned+=p.coins;
+      state.stats.weeklyEarned=0;
+      state.stats.weeklyStart=Date.now();
+      setTimeout(()=>{
+        showEventBanner(`${p.medal} ТОП-${myIdx+1} НЕДЕЛИ ${prevWeek}!`);
+        setTimeout(()=>showEventBanner(`+${p.stars}⭐ +${p.coins.toLocaleString('ru-RU')}💰`),1800);
+        setTimeout(()=>toast(`Награда за ${p.place}!`),3600);
+        sfx('levelup');vibrate([50,100,50,100,50]);updateHUD();
+      },1200);
+    }
+    save();
+  }).catch(err=>{console.warn('Reward check error',err);state.rewards.lastCheckedWeek=prevWeek;save();});
+}
+
+// ============= ЛИДЕРБОРД =============
+let lbTab='all';
+function openLeaderboard(){
+  if(yIsYandex){showYandexLeaderboard();return;}
+  if(!fbReady||!fbDB){toast('Firebase нет');return;}
+  if(!state.playerName){openNameModal(true);return;}
+  showLeaderboard();
+}
+async function showYandexLeaderboard(){
+  document.getElementById('tabAll').classList.add('active');
+  document.getElementById('tabSeason').classList.remove('active');
+  document.getElementById('lbList').innerHTML='<div class="stat-row">Загрузка…</div>';
+  document.getElementById('lbModal').classList.add('active');
+  const result=await getYandexLeaderboard();
+  const list=document.getElementById('lbList');
+  list.innerHTML='';
+  if(!result||!result.entries||result.entries.length===0){list.innerHTML='<div class="stat-row">Пока никого!</div>';return;}
+  const info=document.createElement('div');
+  info.style.cssText='text-align:center;font-size:7px;padding:8px;margin-bottom:8px;color:#A4E4FC';
+  info.textContent='🌟 ЛИДЕРБОРД ЯНДЕКС ИГР';
+  list.appendChild(info);
+  result.entries.forEach((entry,i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+    const isMe=result.userRank===i+1;
+    const div=document.createElement('div');
+    div.className='stat-row';
+    div.style.background=isMe?'#005800':'transparent';
+    const name=entry.player.publicName||'Игрок';
+    div.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${medal} <span style="font-size:14px">🌱</span> <b>${name}</b></span><b style="color:#F8B800">${(entry.score||0).toLocaleString('ru-RU')}</b>`;
+    list.appendChild(div);
+  });
+}
+function showLeaderboard(){
+  document.getElementById('tabAll').classList.add('active');
+  document.getElementById('tabSeason').classList.remove('active');
+  document.getElementById('lbList').innerHTML='<div class="stat-row">Загрузка…</div>';
+  document.getElementById('lbModal').classList.add('active');
+  loadLeaderboard('all');
+}
+function switchLbTab(tab){
+  lbTab=tab;
+  document.getElementById('tabAll').classList.toggle('active',tab==='all');
+  document.getElementById('tabSeason').classList.toggle('active',tab==='season');
+  document.getElementById('lbList').innerHTML='<div class="stat-row">Загрузка…</div>';
+  loadLeaderboard(tab);
+}
+document.getElementById('lbRefreshBtn').onclick=()=>{
+  if(yIsYandex){showYandexLeaderboard();return;}
+  document.getElementById('lbList').innerHTML='<div class="stat-row">Загрузка…</div>';
+  loadLeaderboard(lbTab);
+};
+function loadLeaderboard(tab){
+  const path=tab==='all'?'scores':'seasonal';
+  const orderField=tab==='all'?'coins':'weekly';
+  const currentWeek=seasonWeek();
+  const cacheKey=tab==='all'?'cachedLbAll':'cachedLbSeason';
+  if(!navigator.onLine||!fbReady||!fbDB||state.offline.isOffline){
+    const cached=state.offline[cacheKey];
+    if(cached)renderLbList(cached,tab,currentWeek,true);
+    else document.getElementById('lbList').innerHTML='<div class="stat-row" style="text-align:center;padding:14px">📴 ОФФЛАЙН<br><br>Данных пока нет — зайди с интернетом</div>';
+    return;
+  }
+  fbDB.ref(path).once('value').then(snap=>{
+    const arr=[];
+    snap.forEach(ch=>{const v=ch.val();if(v&&typeof v==='object')arr.push(v);});
+    let filtered=arr;
+    if(tab==='season')filtered=arr.filter(r=>r.week===currentWeek);
+    filtered.sort((a,b)=>(b[orderField]||0)-(a[orderField]||0));
+    const sliced=filtered.slice(0,50);
+    state.offline[cacheKey]=sliced;
+    state.offline.lastLbFetch=Date.now();
+    save();
+    renderLbList(sliced,tab,currentWeek,false);
+  }).catch(err=>{
+    console.warn('LB error',err);
+    const cached=state.offline[cacheKey];
+    if(cached)renderLbList(cached,tab,currentWeek,true);
+    else document.getElementById('lbList').innerHTML='<div class="stat-row">Ошибка загрузки</div>';
+  });
+}
+function renderLbList(arr,tab,currentWeek,isCached){
+  const list=document.getElementById('lbList');
+  list.innerHTML='';
+  if(isCached){
+    const info=document.createElement('div');
+    info.style.cssText='text-align:center;font-size:6px;padding:6px;margin-bottom:6px;background:#3C2000;border:2px solid #F8B800;color:#F8B800';
+    info.textContent='📴 ОФФЛАЙН — последние данные';
+    list.appendChild(info);
+  }
+  if(arr.length===0){list.innerHTML='<div class="stat-row">Пока никого!</div>';return;}
+  if(tab==='season'){
+    const end=new Date(seasonEndTime());
+    const info=document.createElement('div');
+    info.style.cssText='text-align:center;font-size:7px;padding:8px;margin-bottom:8px;color:#A4E4FC';
+    info.textContent=`НЕДЕЛЯ ${currentWeek} • ДО ${end.getDate()}.${end.getMonth()+1}`;
+    list.appendChild(info);
+  }
+  arr.slice(0,20).forEach((row,i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+    const isMe=row.name===state.playerName;
+    const div=document.createElement('div');
+    div.className='stat-row';
+    div.style.background=isMe?'#005800':'transparent';
+    const value=tab==='all'?(row.coins||0):(row.weekly||0);
+    const av=row.avatar||'🌱';
+    div.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${medal} <span style="font-size:14px">${av}</span> <b>${row.name||'???'}</b></span><b style="color:#F8B800">${value.toLocaleString('ru-RU')}</b>`;
+    list.appendChild(div);
+  });
+}
+
+// ============= МОДАЛКА ИМЕНИ =============
+let selectedAvatar='🌱';
+function renderAvatarGrid(){
+  const grid=document.getElementById('avatarGrid');
+  if(!grid)return;
+  grid.innerHTML='';
+  AVATARS.forEach(a=>{
+    const b=document.createElement('button');
+    b.className='avatar-btn'+(a===selectedAvatar?' active':'');
+    b.textContent=a;b.type='button';
+    b.onclick=()=>{selectedAvatar=a;renderAvatarGrid();};
+    grid.appendChild(b);
+  });
+}
+function openNameModal(isFirstTime){
+  selectedAvatar=state.avatar||AVATARS[Math.floor(Math.random()*AVATARS.length)];
+  if(isFirstTime)document.getElementById('nameInput').value='';
+  else document.getElementById('nameInput').value=state.playerName||'';
+  document.getElementById('nameError').style.display='none';
+  renderAvatarGrid();
+  document.getElementById('nameModal').classList.add('active');
+}
+document.getElementById('nameSaveBtn').onclick=()=>{
+  const raw=document.getElementById('nameInput').value.trim().slice(0,15);
+  const name=raw.replace(/[^\wа-яА-ЯёЁ \-]/g,'');
+  const err=document.getElementById('nameError');
+  if(name.length<2){err.textContent='Минимум 2 символа!';err.style.display='block';return;}
+  err.style.display='none';
+  state.playerName=name;
+  state.avatar=selectedAvatar;
+  save();
+  closeModal('nameModal');
+  toast('Привет, '+name+'!');
+  submitScore(true);
+  updateMenuStats();
+};
+
+// ============= СМЕНА НИКА =============
+let renameAvatar='🌱';
+function renderRenameAvatarGrid(){
+  const grid=document.getElementById('renameAvatarGrid');
+  if(!grid)return;
+  grid.innerHTML='';
+  AVATARS.forEach(a=>{
+    const b=document.createElement('button');
+    b.className='avatar-btn'+(a===renameAvatar?' active':'');
+    b.textContent=a;b.type='button';
+    b.onclick=()=>{renameAvatar=a;renderRenameAvatarGrid();};
+    grid.appendChild(b);
+  });
+}
+function openRenameModal(){
+  if(!state.playerName){toast('Сначала введи имя');return;}
+  renameAvatar=state.avatar||'🌱';
+  document.getElementById('renameInput').value=state.playerName||'';
+  document.getElementById('renameError').style.display='none';
+  renderRenameAvatarGrid();
+  document.getElementById('renameModal').classList.add('active');
+}
+document.getElementById('renameSaveBtn').onclick=()=>{
+  const raw=document.getElementById('renameInput').value.trim().slice(0,15);
+  const newName=raw.replace(/[^\wа-яА-ЯёЁ \-]/g,'');
+  const err=document.getElementById('renameError');
+  if(newName.length<2){err.textContent='Минимум 2 символа!';err.style.display='block';return;}
+  if(newName===state.playerName&&renameAvatar===state.avatar){err.textContent='Ничего не изменилось';err.style.display='block';return;}
+  const oldKey=state.playerName.toLowerCase().replace(/\s+/g,'_');
+  const week=seasonWeek();
+  if(fbReady&&fbDB&&navigator.onLine&&!state.offline.isOffline){
+    try{
+      fbDB.ref('scores/'+oldKey).remove();
+      fbDB.ref('seasonal/'+oldKey).remove();
+      fbDB.ref('seasonal_archive/w'+week+'/'+oldKey).remove();
+    }catch(e){}
+  }
+  state.playerName=newName;
+  state.avatar=renameAvatar;
+  save();
+  submitScore(true);
+  closeModal('renameModal');
+  toast('Теперь ты '+newName+'!');
+  sfx('levelup');vibrate([20,40,20]);
+  updateMenuStats();
+};
+
+// ============= МАГАЗИН (фикс замка) =============
+function openShop(){
+  const list=document.getElementById('shopList');list.innerHTML='';
+  Object.values(PLANTS).forEach(p=>{
+    if(p.special)return;
+    if(p.hybrid&&!state.hybridSeeds.includes(p.id))return;
+    const owned=state.ownedSeeds.includes(p.id);
+    const equipped=state.equipped===p.id;
+    // ФИКС: если уже куплено — не показываем как заблокированное
+    const locked=!owned&&p.unlock>1&&state.level<p.unlock;
+    const isHybrid=!!p.hybrid;
+    const hybridCount=isHybrid?(state.hybridInventory[p.id]||0):0;
+    const hybridEmpty=isHybrid&&hybridCount===0;
+    const sBoost=seasonBoost(p.id);
+    const div=document.createElement('div');div.className='shop-item';
+    let subText='';
+    if(locked)subText=`🔒 УР.${p.unlock}`;
+    else if(isHybrid)subText=`Семян: ${hybridCount}`;
+    else if(sBoost>1)subText='Сезон x1.5';
+    div.innerHTML=`<span class="emoji">${p.emoji}</span><div class="info"><div class="name">${p.name}${sBoost>1?' 🌟':''}</div><div class="price">${owned?`+${p.reward} • ${p.growTime}с`:`${p.price.toLocaleString('ru-RU')}💰`}</div><div class="sub">${subText}</div></div><button>${locked?'🔒':(hybridEmpty?'0':(!owned?'КУПИТЬ':equipped?'✓':'ВЫБРАТЬ'))}</button>`;
+    const btn=div.querySelector('button');
+    if(locked)btn.disabled=true;
+    else if(hybridEmpty)btn.disabled=true;
+    else if(equipped)btn.classList.add('equipped');
+    else if(owned)btn.classList.add('owned');
+    else if(state.coins<p.price)btn.disabled=true;
+    btn.onclick=()=>{
+      if(!owned){
+        if(state.coins<p.price){toast('Мало монет');sfx('error');return;}
+        state.coins-=p.price;state.ownedSeeds.push(p.id);state.equipped=p.id;
+        sfx('buy');vibrate(15);toast('Куплено');
+      }else{state.equipped=p.id;sfx('plant');toast('Выбрано');}
+      updateHUD();save();openShop();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('shopModal').classList.add('active');
+}
+function upgradePrice(key,level){return Math.round(UPGRADES[key].basePrice*Math.pow(UPGRADES[key].mult,level));}
+function openUpgrades(){
+  const list=document.getElementById('upgradeList');list.innerHTML='';
+  Object.keys(UPGRADES).forEach(key=>{
+    const u=UPGRADES[key];
+    const lvl=state.upgrades[key];
+    const maxed=lvl>=u.maxLevel;
+    const price=upgradePrice(key,lvl);
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">${u.icon}</span><div class="info"><div class="name">${u.name} ${lvl}/${u.maxLevel}</div><div class="price">${maxed?'МАКС':`${price.toLocaleString('ru-RU')}💰`}</div><div class="sub">${u.desc}</div></div><button ${maxed||state.coins<price?'disabled':''}>${maxed?'✓':'УЛУЧ.'}</button>`;
+    div.querySelector('button').onclick=()=>{
+      const p=upgradePrice(key,state.upgrades[key]);
+      if(state.coins<p)return;
+      state.coins-=p;state.upgrades[key]++;
+      toast(key==='plots'?'+1 грядка!':`${u.name}!`);
+      sfx('levelup');vibrate([10,20,10]);
+      updateHUD();save();openUpgrades();
+    };
+    list.appendChild(div);
+  });
+  const houseDiv=document.createElement('div');
+  houseDiv.style.marginTop='14px';houseDiv.style.paddingTop='10px';houseDiv.style.borderTop='2px solid #7C7C7C';
+  const cur=HOUSE_LEVELS[state.houseLevel];
+  const next=HOUSE_LEVELS[state.houseLevel+1];
+  let hh=`<h3 style="text-align:center;margin-bottom:10px;color:#A4E4FC;font-size:9px">🏡 ДОМИК</h3>`;
+  hh+=`<div class="shop-item"><span class="emoji">${cur.icon}</span><div class="info"><div class="name">${cur.name} ур.${cur.level}</div><div class="price">${cur.rate}/мин</div><div class="sub">НАК: ${Math.floor(state.houseAccum).toLocaleString('ru-RU')}💰</div></div><button ${state.houseAccum>=1?'':'disabled'}>СОБРАТЬ</button></div>`;
+  if(next)hh+=`<div class="shop-item"><span class="emoji">${next.icon}</span><div class="info"><div class="name">${next.name} → ${next.level}</div><div class="price">${next.cost.toLocaleString('ru-RU')}💰</div><div class="sub">${next.rate}/мин</div></div><button ${state.coins<next.cost?'disabled':''}>ПОСТР.</button></div>`;
+  else hh+=`<div class="shop-item"><span class="emoji">👑</span><div class="info"><div class="name">МАКС!</div></div></div>`;
+  houseDiv.innerHTML=hh;
+  const hBtns=houseDiv.querySelectorAll('button');
+  if(hBtns[0])hBtns[0].onclick=()=>{
+    const collect=Math.floor(state.houseAccum);
+    if(collect<1)return;
+    state.coins+=collect;state.stats.totalEarned+=collect;state.houseAccum-=collect;
+    toast(`+${collect.toLocaleString('ru-RU')}`);
+    sfx('reward');vibrate(15);
+    updateHUD();save();openUpgrades();
+  };
+  if(hBtns[1]&&next)hBtns[1].onclick=()=>{
+    if(state.coins<next.cost)return;
+    state.coins-=next.cost;state.houseLevel++;state.houseLastTick=Date.now();
+    toast(`${next.name}!`);
+    sfx('levelup');vibrate([30,60,30]);
+    updateHUD();save();openUpgrades();
+  };
+  list.appendChild(houseDiv);
+  document.getElementById('upgradeModal').classList.add('active');
+}
+function canCraft(id){const h=HYBRIDS[id];if(!h)return false;return Object.keys(h.recipe).every(k=>(state.inventory[k]||0)>=h.recipe[k]);}
+function craftHybrid(id){
+  const h=HYBRIDS[id];
+  if(!h||!canCraft(id)){toast('Нет ингредиентов');sfx('error');return;}
+  Object.keys(h.recipe).forEach(k=>{state.inventory[k]-=h.recipe[k];});
+  if(!state.hybridSeeds.includes(id))state.hybridSeeds.push(id);
+  if(!state.ownedSeeds.includes(id))state.ownedSeeds.push(id);
+  state.hybridInventory[id]=(state.hybridInventory[id]||0)+1;
+  toast('+1 семя!');
+  sfx('levelup');vibrate([15,30,15]);
+  checkAchievements();updateHUD();save();openCraft();
+}
+function openCraft(){
+  const list=document.getElementById('craftList');list.innerHTML='';
+  Object.values(HYBRIDS).forEach(h=>{
+    const can=canCraft(h.id);
+    const have=state.hybridInventory[h.id]||0;
+    const recipe=Object.keys(h.recipe).map(k=>{
+      const need=h.recipe[k];const got=state.inventory[k]||0;
+      const p=PLANTS[k];const emoji=p?p.emoji:k;
+      const color=got>=need?'#A4E4FC':'#FC7460';
+      return `<span style="color:${color}">${emoji}${got}/${need}</span>`;
+    }).join(' ');
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">${h.icon}</span><div class="info"><div class="name">${h.name}${have>0?` [${have}]`:''}</div><div class="price">+${h.reward.toLocaleString('ru-RU')}</div><div class="sub">${recipe}</div></div><button ${can?'':'disabled'}>${can?'КРАФТ':'—'}</button>`;
+    div.querySelector('button').onclick=()=>craftHybrid(h.id);
+    list.appendChild(div);
+  });
+  document.getElementById('craftModal').classList.add('active');
+}
+function openPets(){
+  const list=document.getElementById('petList');list.innerHTML='';
+  Object.values(PETS).forEach(pet=>{
+    if(pet.id==='none')return;
+    const owned=state.ownedPets.includes(pet.id);
+    const active=state.activePet===pet.id;
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">${pet.icon}</span><div class="info"><div class="name">${pet.name}</div><div class="price">${owned?pet.desc:`${pet.price.toLocaleString('ru-RU')}`}</div></div><button ${!owned&&state.coins<pet.price?'disabled':''}>${!owned?'КУПИТЬ':active?'✓':'ВЫБРАТЬ'}</button>`;
+    const btn=div.querySelector('button');
+    if(active)btn.classList.add('equipped');
+    else if(owned)btn.classList.add('owned');
+    btn.onclick=()=>{
+      if(!owned){
+        if(state.coins<pet.price)return;
+        state.coins-=pet.price;state.ownedPets.push(pet.id);state.activePet=pet.id;
+        sfx('buy');vibrate(15);toast('Куплен!');
+      }else{state.activePet=pet.id;sfx('plant');toast('Активен');}
+      updateHUD();save();openPets();checkAchievements();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('petModal').classList.add('active');
+}
+function openDaily(){
+  const grid=document.getElementById('dailyGrid');grid.innerHTML='';
+  const slot=dailySlot();
+  const canClaim=canClaimDaily();
+  for(let i=0;i<8;i++){
+    const idx=(slot+i)%DAILY_POOL.length;
+    const r=DAILY_POOL[idx];
+    const div=document.createElement('div');div.className='daily-day';
+    if(i===0&&canClaim)div.classList.add('today');
+    else if(i===0)div.classList.add('claimed');
+    div.innerHTML=`<span class="d-ico">${r.icon}</span>${i===0?'СЕЙЧ':`+${i*4}Ч`}<br><b>${r.reward.toLocaleString('ru-RU')}</b>`;
+    grid.appendChild(div);
+  }
+  const btn=document.getElementById('claimDailyBtn');
+  const x2btn=document.getElementById('claimDailyX2Btn');
+  const reward=currentDailyReward();
+  if(canClaim){btn.textContent=`ЗАБРАТЬ ${reward.reward.toLocaleString('ru-RU')}`;btn.disabled=false;if(x2btn){x2btn.disabled=false;x2btn.textContent=`ЗАБРАТЬ X2 📺 (${(reward.reward*2).toLocaleString('ru-RU')})`;}}
+  else{
+    const nextSlotTime=(slot+1)*4*3600000;
+    const remainMs=Math.max(0,nextSlotTime-Date.now());
+    const h=Math.floor(remainMs/3600000);const m=Math.floor((remainMs%3600000)/60000);
+    btn.textContent=`${h}Ч ${m}М`;btn.disabled=true;
+    if(x2btn){x2btn.disabled=true;x2btn.textContent='ЗАБРАТЬ X2 📺';}
+  }
+  document.getElementById('dailyModal').classList.add('active');
+}
+function grantDaily(mult,e){
+  const reward=currentDailyReward();
+  const amount=reward.reward*mult;
+  state.coins+=amount;state.stats.totalEarned+=amount;state.stats.weeklyEarned+=amount;
+  state.stats.dailyClaimCount++;state.stats.lastDailySlot=dailySlot();state.stats.lastDailyClaim=Date.now();
+  const fly=document.createElement('div');fly.className='fly-coin';fly.textContent=`+${amount}`;
+  fly.style.left=(e&&e.clientX||window.innerWidth/2)+'px';fly.style.top=(e&&e.clientY||window.innerHeight/2)+'px';
+  document.body.appendChild(fly);
+  const coinsEl=document.getElementById('coins');const rect=coinsEl.getBoundingClientRect();
+  setTimeout(()=>{fly.style.left=(rect.left+rect.width/2)+'px';fly.style.top=(rect.top+rect.height/2)+'px';fly.style.opacity='0';fly.style.transform='scale(0.5)';},30);
+  setTimeout(()=>fly.remove(),900);
+  toast(`+${amount.toLocaleString('ru-RU')}`);
+  sfx('reward');vibrate([20,50,20,50,20]);
+  updateHUD();save();openDaily();
+  // Полноэкранная реклама ПОСЛЕ получения награды — естественная пауза, разрешена правилами
+  setTimeout(()=>showFullscreenAd(),600);
+}
+document.getElementById('claimDailyBtn').onclick=(e)=>{
+  if(!canClaimDaily())return;
+  grantDaily(1,e);
+};
+document.getElementById('claimDailyX2Btn').onclick=()=>{
+  if(!canClaimDaily())return;
+  showRewardedAd(()=>grantDaily(2,null));
+};
+function openQuests(){
+  generateQuests();
+  document.getElementById('tabDaily').classList.add('active');
+  document.getElementById('tabNPC').classList.remove('active');
+  document.getElementById('questModal').classList.add('active');
+  renderQuestTab('daily');
+}
+function switchQuestTab(tab){
+  document.getElementById('tabDaily').classList.toggle('active',tab==='daily');
+  document.getElementById('tabNPC').classList.toggle('active',tab==='npc');
+  renderQuestTab(tab);
+}
+function renderQuestTab(tab){
+  const list=document.getElementById('questList');list.innerHTML='';
+  if(tab==='daily'){
+    const ready=unclaimedQuests();
+    if(ready>0){
+      const allBtn=document.createElement('button');
+      allBtn.className='claim-all-btn';allBtn.textContent=`ЗАБРАТЬ ВСЁ (${ready})`;
+      allBtn.onclick=()=>{
+        let total=0,count=0;
+        state.quests.list.forEach(q=>{if(q.done&&!q.claimed){q.claimed=true;state.coins+=q.reward;state.stats.totalEarned+=q.reward;state.stats.weeklyEarned+=q.reward;total+=q.reward;count++;}});
+        toast(`+${total.toLocaleString('ru-RU')}`);
+        sfx('reward');vibrate([30,60,30]);
+        updateHUD();save();renderQuestTab('daily');
+      };
+      list.appendChild(allBtn);
+    }
+    state.quests.list.forEach(q=>{
+      const div=document.createElement('div');
+      const cls=q.claimed?' done':(q.done?' ready':'');
+      div.className='quest-item'+cls;
+      const pct=Math.min(100,((q.progress||0)/q.target)*100);
+      let html=`<div class="q-head"><span class="q-name">${q.name} ${q.claimed?'✓':''}</span><span class="q-reward">+${q.reward}</span></div>`;
+      if(q.done&&!q.claimed)html+=`<button class="claim-btn" style="width:100%;margin-top:6px">ЗАБРАТЬ</button>`;
+      else html+=`<div class="q-bar"><div class="q-fill" style="width:${pct}%"></div></div><div class="q-status">${Math.min(q.progress||0,q.target)} / ${q.target}</div>`;
+      div.innerHTML=html;
+      if(q.done&&!q.claimed)div.querySelector('.claim-btn').onclick=()=>{
+        q.claimed=true;state.coins+=q.reward;state.stats.totalEarned+=q.reward;state.stats.weeklyEarned+=q.reward;
+        toast(`+${q.reward}`);sfx('reward');vibrate(15);
+        updateHUD();save();renderQuestTab('daily');
+      };
+      list.appendChild(div);
+    });
+  }else{
+    const header=document.createElement('div');
+    header.style.cssText='text-align:center;font-size:7px;margin-bottom:10px;color:#A4E4FC;line-height:1.6';
+    header.innerHTML=`ДЕНЬ <b style="color:#F8B800">${state.npcQuests.day}</b> / 7<br>ВЫПОЛНЕНО: <b style="color:#58D854">${state.npcQuests.completed.length}</b>`;
+    list.appendChild(header);
+    NPC_QUEST_CHAIN.forEach(q=>{
+      const done=state.npcQuests.completed.includes(q.day);
+      const active=state.npcQuests.day===q.day&&!done;
+      const locked=state.npcQuests.day<q.day;
+      const div=document.createElement('div');
+      const cls=done?' done':(active?' ready':' locked');
+      div.className='quest-item'+cls;
+      let html=`<div class="q-head"><span class="q-name">${q.icon} День ${q.day}: ${q.name}</span><span class="q-reward">+${q.reward.toLocaleString('ru-RU')}</span></div>`;
+      if(active){
+        const prog=state.npcQuests.progress[q.type]||0;
+        const pct=Math.min(100,(prog/q.target)*100);
+        html+=`<div class="q-bar"><div class="q-fill" style="width:${pct}%"></div></div><div class="q-status">${Math.min(prog,q.target)} / ${q.target}</div>`;
+      }else if(done){html+=`<div class="q-status" style="color:#58D854">ВЫПОЛНЕНО ✓</div>`;}
+      else if(locked){html+=`<div class="q-status">🔒</div>`;}
+      div.innerHTML=html;
+      list.appendChild(div);
+    });
+  }
+}
+function openSkins(){
+  const list=document.getElementById('skinList');list.innerHTML='';
+  Object.values(SKINS).forEach(sk=>{
+    const owned=state.ownedSkins.includes(sk.id);
+    const active=state.activeSkin===sk.id;
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">${sk.icon}</span><div class="info"><div class="name">${sk.name}</div><div class="price">${owned?'КУПЛЕНО':`${sk.price.toLocaleString('ru-RU')}`}</div></div><button ${!owned&&state.coins<sk.price?'disabled':''}>${!owned?'КУПИТЬ':active?'✓':'ВЫБРАТЬ'}</button>`;
+    const btn=div.querySelector('button');
+    if(active)btn.classList.add('equipped');
+    else if(owned)btn.classList.add('owned');
+    btn.onclick=()=>{
+      if(!owned){
+        if(state.coins<sk.price)return;
+        state.coins-=sk.price;state.ownedSkins.push(sk.id);state.activeSkin=sk.id;
+        sfx('buy');toast('Скин');
+      }else{state.activeSkin=sk.id;sfx('plant');toast('Скин');}
+      updateHUD();save();openSkins();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('skinModal').classList.add('active');
+}
+function openStats(){
+  document.getElementById('tabStat').classList.add('active');
+  document.getElementById('tabRecords').classList.remove('active');
+  document.getElementById('statModal').classList.add('active');
+  renderStatTab('stat');
+}
+function switchStatTab(tab){
+  document.getElementById('tabStat').classList.toggle('active',tab==='stat');
+  document.getElementById('tabRecords').classList.toggle('active',tab==='records');
+  renderStatTab(tab);
+}
+function renderStatTab(tab){
+  const list=document.getElementById('statList');
+  if(tab==='stat'){
+    const st=state.stats;
+    list.innerHTML=`<div class="stat-row"><span>ИМЯ</span><b>${state.avatar||'🌱'} ${state.playerName||'—'}</b></div><div class="stat-row"><span>УРОЖАЙ</span><b>${st.totalHarvest}</b></div><div class="stat-row"><span>ЗАРАБОТАНО</span><b>${st.totalEarned.toLocaleString('ru-RU')}</b></div><div class="stat-row"><span>ЗА НЕДЕЛЮ</span><b>${st.weeklyEarned.toLocaleString('ru-RU')}</b></div><div class="stat-row"><span>ЗОЛОТЫХ</span><b>${st.totalGolden}</b></div><div class="stat-row"><span>УРОВЕНЬ</span><b>${state.level}</b></div><div class="stat-row"><span>ПРЕСТИЖ</span><b>${state.prestige} (+${state.prestige*10}%)</b></div><div class="stat-row"><span>ЗВЁЗДЫ</span><b>${state.prestigeStars}</b></div><div class="stat-row"><span>ДОМИК</span><b>${HOUSE_LEVELS[state.houseLevel].icon} ${state.houseLevel}</b></div><div class="stat-row"><span>РЫБ</span><b>${state.fishing.totalCaught}</b></div><div class="stat-row"><span>В АКВАРИУМЕ</span><b>${Object.keys(state.aquarium).length}</b></div><div class="stat-row"><span>БОНУС АКВ.</span><b>+${Object.keys(state.aquarium).length}%</b></div>`;
+  }else{
+    const r=state.records;
+    list.innerHTML=`<div class="stat-row"><span>ЛУЧШИЙ УРОЖАЙ</span><b>${r.bestHarvest.toLocaleString('ru-RU')}</b></div><div class="stat-row"><span>ЛУЧШАЯ РЫБА</span><b>${r.bestFishPrice.toLocaleString('ru-RU')}</b></div><div class="stat-row"><span>МАКС МОНЕТ</span><b>${r.maxCoins.toLocaleString('ru-RU')}</b></div><div class="stat-row"><span>СЕРИЯ ДНЕЙ</span><b>${r.currentStreak} 🔥</b></div><div class="stat-row"><span>ЛУЧШАЯ СЕРИЯ</span><b>${r.longestStreak}</b></div><div class="stat-row"><span>ВСЕГО ДНЕЙ</span><b>${r.totalPlayDays}</b></div><div class="stat-row"><span>БОССОВ</span><b>${r.bossKilled}</b></div><div class="stat-row"><span>СОБЫТИЙ</span><b>${r.weatherEvents}</b></div><div class="stat-row"><span>ПРЕСТИЖЕЙ</span><b>${state.prestige}</b></div><div class="stat-row"><span>ГИБРИДОВ</span><b>${state.hybridSeeds.length}</b></div>`;
+  }
+}
+function checkAchievements(){
+  ACHIEVEMENTS.forEach(a=>{
+    if(state.achievements[a.id])return;
+    let value=0;
+    if(a.type==='harvest')value=state.stats.totalHarvest;
+    else if(a.type==='coins')value=state.coins;
+    else if(a.type==='level')value=state.level;
+    else if(a.type==='golden')value=state.stats.totalGolden;
+    else if(a.type==='pets')value=state.ownedPets.filter(p=>p!=='none').length;
+    else if(a.type==='hybrid')value=state.hybridSeeds.length;
+    else if(a.type==='fish')value=state.fishing.totalCaught;
+    else if(a.type==='sturgeon')value=state.fishing.bestFish==='sturgeon'?1:0;
+    else if(a.type==='aqua')value=Object.keys(state.aquarium).length;
+    if(value>=a.target){state.achievements[a.id]=true;toast(`${a.name}!`);sfx('reward');updateHUD();}
+  });
+}
+function openAch(){
+  const list=document.getElementById('achList');list.innerHTML='';
+  const ready=unclaimedAchievements();
+  if(ready>0){
+    const allBtn=document.createElement('button');
+    allBtn.className='claim-all-btn';allBtn.textContent=`ЗАБРАТЬ ВСЁ (${ready})`;
+    allBtn.onclick=()=>{
+      let total=0,count=0;
+      ACHIEVEMENTS.forEach(a=>{if(state.achievements[a.id]&&!state.claimedAchievements[a.id]){state.claimedAchievements[a.id]=true;state.coins+=a.reward;state.stats.totalEarned+=a.reward;state.stats.weeklyEarned+=a.reward;total+=a.reward;count++;}});
+      toast(`+${total.toLocaleString('ru-RU')}`);
+      sfx('reward');vibrate([30,60,30]);
+      updateHUD();save();openAch();
+    };
+    list.appendChild(allBtn);
+  }
+  ACHIEVEMENTS.forEach(a=>{
+    const un=!!state.achievements[a.id];const claimed=!!state.claimedAchievements[a.id];
+    const div=document.createElement('div');
+    const cls=claimed?' unlocked':(un?' ready':'');
+    div.className='ach-item'+cls;
+    let html=`<span class="a-ico">${a.icon}</span><div class="a-info"><div class="a-name">${a.name} ${claimed?'✓':''}</div><div class="a-desc">${a.desc} • ${a.reward}</div></div>`;
+    if(un&&!claimed)html+=`<button class="claim-btn">ЗАБРАТЬ</button>`;
+    div.innerHTML=html;
+    if(un&&!claimed)div.querySelector('.claim-btn').onclick=()=>{
+      state.claimedAchievements[a.id]=true;
+      state.coins+=a.reward;state.stats.totalEarned+=a.reward;state.stats.weeklyEarned+=a.reward;
+      toast(`+${a.reward}`);sfx('reward');vibrate(15);
+      updateHUD();save();openAch();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('achModal').classList.add('active');
+}
+function openPrestigeShop(){
+  document.getElementById('pStarsView').textContent=state.prestigeStars||0;
+  const list=document.getElementById('prestigeShopList');list.innerHTML='';
+  Object.values(PRESTIGE_SHOP).forEach(p=>{
+    const lvl=state.prestigePurchases[p.id]||0;
+    const maxed=lvl>=p.max;
+    const can=state.prestigeStars>=p.cost&&!maxed;
+    const div=document.createElement('div');div.className='shop-item';
+    div.innerHTML=`<span class="emoji">${p.icon}</span><div class="info"><div class="name">${p.name} ${lvl}/${p.max}</div><div class="price">${maxed?'МАКС':`${p.cost}⭐`}</div><div class="sub">${p.desc}</div></div><button ${can?'':'disabled'}>${maxed?'✓':'КУПИТЬ'}</button>`;
+    div.querySelector('button').onclick=()=>{
+      if(!can)return;
+      state.prestigeStars-=p.cost;state.prestigePurchases[p.id]=lvl+1;
+      toast(`${p.name}!`);sfx('levelup');vibrate([20,40,20]);
+      updateHUD();save();openPrestigeShop();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('prestigeShopModal').classList.add('active');
+}
+function openPrestige(){
+  const info=document.getElementById('prestigeInfo');
+  const btn=document.getElementById('doPrestigeBtn');
+  if(state.level<PRESTIGE_MIN_LEVEL){
+    info.innerHTML=`Престиж на <b>${PRESTIGE_MIN_LEVEL}</b> ур.<br>Сейчас: <b>${state.level}</b>.<br><br>Теряешь монеты, семена, апгрейды, питомцев. Получаешь <b>+10% монет</b>, <b>+1⭐</b> и <b>ЗОЛОТОЙ ПРУД</b>.`;
+    btn.disabled=true;btn.style.background='#3C3C3C';
+  }else{
+    const nextBonus=(state.prestige+1)*10;
+    info.innerHTML=`Престиж: <b>${state.prestige}</b> (+${state.prestige*10}%).<br>После: <b>+${nextBonus}%</b> и <b>+1⭐</b>.<br><br>Потеряется: монеты, семена, апгрейды, питомцы.<br>Останется: престиж, звёзды, достижения, аквариум, имя.`;
+    btn.disabled=false;btn.style.background='#6844FC';
+  }
+  document.getElementById('prestigeModal').classList.add('active');
+}
+document.getElementById('doPrestigeBtn').onclick=()=>{
+  if(state.level<PRESTIGE_MIN_LEVEL)return;
+  if(!confirm('Сбросить прогресс?'))return;
+  const keep={stats:state.stats,achievements:state.achievements,claimedAchievements:state.claimedAchievements,prestige:state.prestige+1,prestigeStars:(state.prestigeStars||0)+1,prestigePurchases:state.prestigePurchases,skin:state.activeSkin,ownedSkins:state.ownedSkins,name:state.playerName,avatar:state.avatar,fishing:state.fishing,aquarium:state.aquarium,records:state.records,npcQuests:state.npcQuests,rewards:state.rewards,offline:state.offline,timeGuard:state.timeGuard,welcomeShown:true};
+  state=defaultState();
+  Object.assign(state,{stats:keep.stats,achievements:keep.achievements,claimedAchievements:keep.claimedAchievements,prestige:keep.prestige,prestigeStars:keep.prestigeStars,prestigePurchases:keep.prestigePurchases,activeSkin:keep.skin,ownedSkins:keep.ownedSkins,playerName:keep.name,avatar:keep.avatar,fishing:keep.fishing,aquarium:keep.aquarium,records:keep.records,npcQuests:keep.npcQuests,rewards:keep.rewards,offline:keep.offline,timeGuard:keep.timeGuard,welcomeShown:true});
+  toast(`Престиж ${state.prestige}!`);
+  if(state.prestige===1)setTimeout(()=>showEventBanner('ЗОЛОТОЙ ПРУД ОТКРЫТ!'),1500);
+  sfx('levelup');vibrate([50,100,50,100,50]);
+  updateHUD();save();closeModal('prestigeModal');
+  // Естественная точка для полноэкранной рекламы — после большого события
+  setTimeout(()=>showFullscreenAd(),2500);
+};
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+document.querySelectorAll('.modal').forEach(m=>{
+  m.addEventListener('click',e=>{
+    if(e.target===m && m.id!=='nameModal') closeModal(m.id);
+  });
+});
+function safeBind(id,fn){
+  const el=document.getElementById(id);
+  if(!el){console.warn('Нет кнопки:',id);return;}
+  el.addEventListener('click',(e)=>{e.preventDefault();try{fn();}catch(err){console.error('Ошибка в '+id+':',err);}});
+}
+safeBind('shopBtn',openShop);
+safeBind('upgradeBtn',openUpgrades);
+safeBind('craftBtn',openCraft);
+safeBind('petBtn',openPets);
+safeBind('fishBtn',openFishing);
+safeBind('aquaBtn',openAquarium);
+safeBind('dailyBtn',openDaily);
+safeBind('questBtn',openQuests);
+safeBind('skinBtn',openSkins);
+safeBind('statBtn',openStats);
+safeBind('lbBtn',openLeaderboard);
+safeBind('achBtn',openAch);
+safeBind('prestigeShopBtn',openPrestigeShop);
+safeBind('prestigeBtn',openPrestige);
+
+document.getElementById('musicToggle').onclick=(e)=>{
+  e.stopPropagation();
+  if(musicPlaying){stopMusic();document.getElementById('musicToggle').textContent='🔇';}
+  else{startMusic();document.getElementById('musicToggle').textContent='🔊';}
+};
+document.getElementById('welcomeOkBtn').onclick=()=>{
+  state.welcomeShown=true;
+  save();
+  closeModal('welcomeModal');
+};
+
+// ============= ГЛАВНОЕ МЕНЮ =============
+const mainMenuEl=document.getElementById('mainMenu');
+function updateMenuStats(){
+  if(!mainMenuEl)return;
+  const pondBtn=document.getElementById('menuPondBtn');
+  const lockBadge=document.getElementById('pondLock');
+  if(canFish()){
+    pondBtn.classList.remove('locked');
+    if(lockBadge)lockBadge.style.display='none';
+  } else {
+    pondBtn.classList.add('locked');
+    if(lockBadge){lockBadge.style.display='inline-block';lockBadge.textContent='🔒 УР.'+POND_LEVEL;}
+  }
+  const s=currentSeason(),w=currentWeather();
+  const statsEl=document.getElementById('menuStats');
+  if(statsEl){
+    statsEl.innerHTML=
+      `<div class="menu-player"><span class="av">${state.avatar||'🌱'}</span><b>${state.playerName||'Игрок'}</b></div>`+
+      `⭐ УР. <b>${state.level}</b> • 💰 <b>${state.coins.toLocaleString('ru-RU')}</b> • 🌾 <b>${state.stats.totalHarvest}</b><br>`+
+      `${s.icon} ${s.name} • ${w.icon} ${w.name}`;
+  }
+}
+function showMainMenu(){if(!mainMenuEl)return;mainMenuEl.classList.remove('hidden');updateMenuStats();}
+function hideMainMenu(){if(!mainMenuEl)return;mainMenuEl.classList.add('hidden');}
+document.getElementById('menuPlayBtn').onclick=()=>{
+  initAudio();startMusic();
+  hideMainMenu();
+  if(!state.welcomeShown)setTimeout(()=>document.getElementById('welcomeModal').classList.add('active'),150);
+};
+document.getElementById('menuToggle').onclick=(e)=>{e.stopPropagation();showMainMenu();};
+document.getElementById('menuRulesBtn').onclick=()=>{document.getElementById('rulesModal').classList.add('active');};
+document.getElementById('menuPondBtn').onclick=()=>{
+  if(!canFish()){
+    const left=POND_LEVEL-state.level;
+    showEventBanner(`🔒 ПРУД НА ${POND_LEVEL} УРОВНЕ`);
+    setTimeout(()=>showEventBanner(`ОСТАЛОСЬ ${left} УР.`),1600);
+    toast(`Откроется на ${POND_LEVEL} уровне`);
+    sfx('error');vibrate(30);return;
+  }
+  hideMainMenu();openFishing();
+};
+document.getElementById('menuAquaBtn').onclick=()=>{hideMainMenu();openAquarium();};
+document.getElementById('menuTopBtn').onclick=()=>{hideMainMenu();openLeaderboard();};
+document.getElementById('menuAchBtn').onclick=()=>{hideMainMenu();openAch();};
+document.getElementById('menuShopBtn').onclick=()=>{hideMainMenu();openShop();};
+document.getElementById('menuRenameBtn').onclick=()=>{openRenameModal();};
+document.getElementById('menuBoostBtn').onclick=()=>{hideMainMenu();buyAdBoost();};
+document.getElementById('menuRateBtn').onclick=()=>{state.reviewAsked=false;maybeAskReview();};
+// Таймер буста на кнопке в меню
+setInterval(()=>{
+  const b=document.getElementById('menuBoostBtn');
+  if(!b)return;
+  if(adBoostActive()){
+    const left=Math.ceil((state.adBoostUntil-Date.now())/60000);
+    b.textContent=`⚡ БУСТ АКТИВЕН: ${left} МИН`;
+  } else b.textContent='⚡ РОСТ X2 📺';
+},1000);
+setInterval(()=>{if(mainMenuEl&&!mainMenuEl.classList.contains('hidden'))updateMenuStats();},1000);
+
+window.addEventListener('error',function(e){
+  console.error('GLOBAL ERROR:',e.message,e.filename,e.lineno);
+  const el=document.getElementById('loading');
+  if(el){
+    el.innerHTML='<div style="color:#FC7460;padding:20px;font-size:10px;text-align:left;max-width:90%"><b>ОШИБКА:</b><br>'+(e.message||'?')+'<br><br>Строка: '+(e.lineno||'?')+'<br><br><button onclick="location.reload()" style="padding:8px 14px;background:#00A800;color:#fff;border:2px solid #000;font-family:monospace;font-weight:bold">ПЕРЕЗАГРУЗИТЬ</button></div>';
+  }
+});
+
+// ============= ИНИЦИАЛИЗАЦИЯ =============
+async function init(){
+  if(window._gameInited){resizeCanvas();render();return;}
+  window._gameInited=true;
+  try{
+    await initYandexSDK();
+    let cloudState=null;
+    if(yIsYandex)cloudState=await loadFromCloud();
+    const localState=load();
+    state=cloudState||localState||defaultState();
+
+    // ЗАЩИТА ОТ ЧАСОВ
+    checkTimeGuard();
+
+    updateStreak();
+    applyOfflineGrowth();
+    generateQuests();
+    resizeCanvas();
+    initAtmosphere();
+    updateHUD();
+    render();
+    setInterval(save,15000);
+    setInterval(updateHUD,1000);
+    document.addEventListener('visibilitychange',()=>{
+      if(document.hidden){
+        save();
+        if(musicPlaying){stopMusic();document.getElementById('musicToggle').textContent='🔇';}
+        stopRender();
+      } else {
+        // Проверяем время при возврате
+        checkTimeGuard();
+        setTimeout(()=>{resizeCanvas();render();lastTick=performance.now();},200);
+      }
+    });
+    window.addEventListener('beforeunload',()=>{save();stopMusic();});
+    window.addEventListener('blur',()=>{if(musicPlaying){stopMusic();document.getElementById('musicToggle').textContent='🔇';}});
+    window.addEventListener('pageshow',()=>{checkTimeGuard();resizeCanvas();render();});
+    let lastTick=performance.now();
+    function loop(now){
+      try{
+        const dt=(now-lastTick)/1000;lastTick=now;
+        const weatherMult=currentWeather().growMult;
+        state.plots.forEach(p=>{
+          if(p&&p.seed&&p.progress<100){
+            const plant=PLANTS[p.seed];
+            if(plant){
+              const rate=100/(plant.growTime*2);
+              p.progress=Math.min(100,p.progress+rate*dt*weatherMult*seasonBoost(p.seed)*speedMult()*nightMult());
+            }
+          }
+        });
+        processPet(state.activePet,dt);
+        // Домик с капом на 4 часа
+        if(state.houseLevel>0){
+          const rate=HOUSE_LEVELS[state.houseLevel].rate;
+          const nowMs=Date.now();
+          const elapsed=(nowMs-state.houseLastTick)/60000;
+          const capped=Math.min(elapsed,MAX_OFFLINE_MS/60000);
+          if(capped>0){state.houseAccum+=rate*capped;state.houseLastTick=nowMs;}
+        }
+      }catch(e){}
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    setInterval(()=>{rollWeather();updateHUD();save();},120000);
+    setInterval(()=>{changeSeason();updateHUD();save();},300000);
+    setInterval(tryRandomEvent,150000);
+    setInterval(trySeasonalEvent,600000);
+    setInterval(trySpawnBoss,1800000);
+    setInterval(()=>{if(Date.now()>npcNext)spawnNpc();},30000);
+    setInterval(generateQuests,3600000);
+    setInterval(()=>{if(Date.now()-state.stats.weeklyStart>7*86400000){state.stats.weeklyEarned=0;state.stats.weeklyStart=Date.now();}},3600000);
+    setTimeout(()=>{
+      const el=document.getElementById('loading');
+      if(el){el.style.transition='opacity .4s';el.style.opacity='0';setTimeout(()=>el.remove(),500);}
+    },400);
+    setTimeout(checkAchievements,500);
+    if(navigator.onLine)state.offline.isOffline=false;
+    updateOfflineBadge();
+    setTimeout(()=>{if(navigator.onLine)flushOfflineQueue();},1500);
+    setTimeout(()=>showMainMenu(),300);
+    if(!state.playerName){
+      setTimeout(()=>openNameModal(true),700);
+    } else {
+      setTimeout(checkWeeklyRewards,3000);
+    }
+    if(yIsYandex)submitToYandexLeaderboard(Math.max(state.stats.totalEarned,state.coins));
+  }catch(e){
+    const el=document.getElementById('loading');
+    if(el)el.innerHTML='<div style="color:#FC7460;padding:20px;font-size:10px">init: '+(e.message||'?')+'</div>';
+    console.error('INIT ERROR:',e);
+  }
+}
+init();
+</script>
+</body>
+</html>
